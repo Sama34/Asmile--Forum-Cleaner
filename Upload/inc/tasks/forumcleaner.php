@@ -30,7 +30,7 @@
 function get_value($name,$default)
 {
 	global $mybb;
-	$value = intval($mybb->settings[$name]);
+	$value = (int)$mybb->settings[$name];
 	return $value ? $value : $default;
 }
 
@@ -115,7 +115,7 @@ function delete_user($uid, $avatars = array())
 
 function task_forumcleaner($task) 
 {
-	global $db,$mybb;
+	global $db,$mybb, $plugins;
 
 	$sysname = 'forumcleaner';
 	$threadlimit = get_value($sysname.'_threadlimit', 30);
@@ -125,13 +125,18 @@ function task_forumcleaner($task)
 
 	$exceptions = array(4);// except Administrators
 
-	foreach (explode(',',$mybb->settings[$sysname.'_groupids']) as $item) 
+	if($mybb->settings[$sysname.'_groupids'] == -1)
 	{
-		$item = intval($item);
-
-		if ($item) 
+		$exceptions = -1;
+	}
+	elseif($mybb->settings[$sysname.'_groupids'] != '')
+	{
+		foreach (explode(',',$mybb->settings[$sysname.'_groupids']) as $gid) 
 		{
-			array_push($exceptions,$item);   
+			if ($gid = (int)$gid) 
+			{
+				array_push($exceptions,$gid);   
+			}
 		}
 	}
 
@@ -190,21 +195,21 @@ function task_forumcleaner($task)
 			// build user groups list
 			$ugroups = array($result['usergroup']);
 
-			if (intval($result['displaygroup']))
+			if ((int)$result['displaygroup'])
 			{
 				array_push($ugroups,$result['displaygroup']);
 			}
 
 			foreach (explode(',',$result['additionalgroups']) as $ug) 
 			{
-				if (intval($ug))
+				if ((int)$ug)
 				{
 					array_push($ugroups,$ug);
 				}
 			}
 
 			// if not in exception list
-			if (!count(array_intersect($exceptions,$ugroups)))
+			if (!count(array_intersect($exceptions,$ugroups)) && $exceptions !== -1)
 			{
 				array_push($users, $result['uid']);
 				if ( $result['avatartype'] == 'upload' )
@@ -224,6 +229,13 @@ function task_forumcleaner($task)
 	// Delete and Update forum stats
 	if (count($users))
 	{
+		if(is_object($plugins))
+		{
+			$args = array(
+				'users'	=> &$users,
+			);
+			$plugins->run_hooks('task_forumcleaner_users', $args);
+		}
 		delete_user($users,$avatars);
 		update_stats(array('numusers' => '-'.count($users)));
 		add_task_log($task, count($users). ' users deleted');
@@ -262,7 +274,7 @@ function task_forumcleaner($task)
 			$forums = array_map('intval',explode(',',$action['fid']));
 			if (count($forums) == 1)
 			{
-				$forum = "fid = '".intval(array_shift($forums))."' AND ";
+				$forum = "fid = '".(int)array_shift($forums)."' AND ";
 			}
 			else
 			{
@@ -339,5 +351,3 @@ function task_forumcleaner($task)
 	add_task_log($task, 'The Forum Cleaning task successfully ran.');
 
 }// function task_forumcleaner($task) 
-
-?>

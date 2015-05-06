@@ -28,29 +28,31 @@
  *  MYBB_ROOT/inc/languages/english/forumcleaner.lang.php
  */
 
-$l['forumcleaner_name'] = "Forum Cleaner";
-$l['forumcleaner_description'] = "A MyBB plugin to help Administrators keep things clean.";
+// Plugin API
+$l['forumcleaner'] = 'Forum Cleaner';
+$l['forumcleaner_desc'] = 'A MyBB plugin to help Administrators keep things clean.';
 
-$l['forumcleaner_options_title'] = "Forum Cleaner options";
-$l['forumcleaner_options_desc'] = "Plugin allows automatically clean forums from old threads ".
+// Settings
+$l['setting_group_forumcleaner'] = "Forum Cleaner options";
+$l['setting_group_forumcleaner_desc'] = "Plugin allows automatically clean forums from old threads ".
 	"and delete inactive and not activated users. Here you can manage plugin ".
 	"options. To setup forums to clean please go to ".
 	"Forums & Posts section of Admin CP.";
 
-$l['forumcleaner_threadlimit_title'] = "Thread transactions limit";
-$l['forumcleaner_threadlimit_desc'] = "Limit number of threads processed in one Forum at one run for one action.<br />Default 30 (if not set or set to 0). To setup Forum Actions please go <a href=\"{1}\">here</a>";
+$l['setting_forumcleaner_threadlimit'] = 'Thread transactions limit';
+$l['setting_forumcleaner_threadlimit_desc'] = 'Limit number of threads processed in one Forum at one run for one action.<br />Default 30 (if not set or set to 0). To setup Forum Actions please go <a href="index.php?module=forum-forumcleaner">here</a>';
 
-$l['forumcleaner_userlimit_title'] = "Users transactions limit";
-$l['forumcleaner_userlimit_desc'] = "Limit number of users deleted during one run.<br />Default 50 (if not set or set to 0).";
+$l['setting_forumcleaner_userlimit'] = "Users transactions limit";
+$l['setting_forumcleaner_userlimit_desc'] = "Limit number of users deleted during one run.<br />Default 50 (if not set or set to 0).";
 
-$l['forumcleaner_awaitingdays_title'] = "Grace period for Awaiting Activation users";
-$l['forumcleaner_awaitingdays_desc'] = "Input days of Grace period for Awaiting Activation users. After this period from registration date users will be deleted.<br />No users will be deleted if set to 0.";
+$l['setting_forumcleaner_awaitingdays'] = "Grace period for Awaiting Activation users";
+$l['setting_forumcleaner_awaitingdays_desc'] = "Input days of Grace period for Awaiting Activation users. After this period from registration date users will be deleted.<br />No users will be deleted if set to 0.";
 
-$l['forumcleaner_inactivedays_title'] = "Grace period for inactive users";
-$l['forumcleaner_inactivedays_desc'] = "Input days of Grace period for inactive users (with no posts). After this period from last visit users will be deleted.<br />No users will be deleted if set to 0.";
+$l['setting_forumcleaner_inactivedays'] = "Grace period for inactive users";
+$l['setting_forumcleaner_inactivedays_desc'] = "Input days of Grace period for inactive users (with no posts). After this period from last visit users will be deleted.<br />No users will be deleted if set to 0.";
 
-$l['forumcleaner_groupids_title'] = "Group exception list for inactive users";
-$l['forumcleaner_groupids_desc'] = "Administrators will be not deleted as inactive users. Here you can add additional exceptions.<br />Input comma separated list of Group IDs.";
+$l['setting_forumcleaner_groupids'] = "Group exception list for inactive users";
+$l['setting_forumcleaner_groupids_desc'] = "Administrators will be not deleted as inactive users. Here you can add additional exceptions.<br />Input comma separated list of Group IDs.";
 
 
 $l['forumcleaner_task_desc'] = "Manage threads on specified forums when they reach a specified age. Delete inactive and not activated users.";
@@ -185,4 +187,3 @@ $l['forumcleaner_target_selected'] = "Target forum for Move action are selected 
 
 
 //$l['forumcleaner_'] = "";
-?>

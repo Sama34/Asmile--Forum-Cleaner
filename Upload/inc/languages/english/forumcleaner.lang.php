@@ -38,4 +38,3 @@ $l['forumcleaner_topics_weeks'] = "week(s)";
 $l['forumcleaner_topics_months'] = "month(s)";
 
 //$l['forumcleaner_'] = "";
-?>
