@@ -633,8 +633,8 @@ function forumcleaner_process_forumactions()
 
 	$errors = array();
 	$update_array = array();
-	$forum_checked[1] = '';
-	$forum_checked[2] = '';
+	$forum_checked['all'] = '';
+	$forum_checked['custom'] = '';
 
 	// Form received.
 	if ($mybb->request_method == "post") {
@@ -647,13 +647,13 @@ function forumcleaner_process_forumactions()
 		{
 			$action = 'add';
 		}
-		if ($mybb->get_input('forum_type', 1) == 2)
+		if ($mybb->get_input('forum_type') == 'custom')
 		{
 			if (count($mybb->get_input('forum_1_forums', 2))<1)
 			{
 				$errors[] = $lang->forumcleaner_no_forum_selected;
 			}
-			$forum_checked[2] = "checked=\"checked\"";
+			$forum_checked['custom'] = "checked=\"checked\"";
 
 			if ($mybb->get_input('forum_1_forums', 2))
 			{
@@ -667,10 +667,10 @@ function forumcleaner_process_forumactions()
 		}
 		else 
 		{ 
-			$forum_checked[1] = "checked=\"checked\"";
+			$forum_checked['all'] = "checked=\"checked\"";
 			$mybb->input['forum_1_forums']='';
 			$update_array['fid'] = '-1';
-		};
+		}
 
 		$update_array['age'] = $mybb->get_input('age', 1);
 		$update_array['agetype']=$mybb->get_input('agetype');
@@ -733,15 +733,15 @@ function forumcleaner_process_forumactions()
 			$update_array = $db_array;
 			if ($update_array['fid'] == '-1')
 			{
-				$forum_checked[1] = "checked=\"checked\"";
-				$forum_checked[2] = '';
-				$mybb->input['forum_type'] = 1;
+				$forum_checked['all'] = "checked=\"checked\"";
+				$forum_checked['custom'] = '';
+				$mybb->input['forum_type'] = 'all';
 			}
 			else
 			{
-				$forum_checked[1] = '';
-				$forum_checked[2] = "checked=\"checked\"";
-				$mybb->input['forum_type'] = 2;
+				$forum_checked['all'] = '';
+				$forum_checked['custom'] = "checked=\"checked\"";
+				$mybb->input['forum_type'] = 'custom';
 				$mybb->input['forum_1_forums'] = explode(',',$update_array['fid']);
 			}
 		}
@@ -790,15 +790,33 @@ function forumcleaner_process_forumactions()
 				'threadslist_display' => 0,
 				'forumslist_display' => 0,
 			);
-			$forum_checked[1] = "checked=\"checked\"";
-			$forum_checked[2] = '';
-			$mybb->input['forum_type'] = 1;
+			$forum_checked['all'] = "checked=\"checked\"";
+			$forum_checked['custom'] = '';
+			$mybb->input['forum_type'] = 'all';
 		}
 
 		$form_container = new FormContainer($action=='edit'?$lang->forumcleaner_edit_forum_action:$lang->forumcleaner_add_forum_action);
 
 		// copy&paste from thread_prefixes.php
-		$actions = "<script type=\"text/javascript\">
+		print_selection_javascript();
+
+		$actions = "
+		<dl style=\"margin-top: 0; margin-bottom: 0; width: 100%\">
+			<dt><label style=\"display: block;\"><input type=\"radio\" name=\"forum_type\" value=\"all\" {$forum_checked['all']} class=\"forums_forums_groups_check\" onclick=\"checkAction('forums');\" style=\"vertical-align: middle;\" /> <strong>{$lang->all_forums}</strong></label></dt>
+			<dt><label style=\"display: block;\"><input type=\"radio\" name=\"forum_type\" value=\"custom\" {$forum_checked['custom']} class=\"forums_forums_groups_check\" onclick=\"checkAction('forums');\" style=\"vertical-align: middle;\" /> <strong>{$lang->select_forums}</strong></label></dt>
+			<dd style=\"margin-top: 4px;\" id=\"forums_forums_groups_custom\" class=\"forums_forums_groups\">
+				<table cellpadding=\"4\">
+					<tr>
+						<td valign=\"top\"><small>{$lang->forums_colon}</small></td>
+						<td>".$form->generate_forum_select('forum_1_forums[]', $mybb->get_input('forum_1_forums', 2), array('id' => 'forums', 'multiple' => true, 'size' => 5))."</td>
+					</tr>
+				</table>
+			</dd>
+		</dl>
+		<script type=\"text/javascript\">
+			checkAction('forums');
+		</script>";
+		/*$actions = "<script type=\"text/javascript\">
 		function checkAction(id)
 		{
 			var checked = '';
@@ -842,7 +860,7 @@ $form->generate_forum_select('forum_1_forums[]',
 </dl>
 <script type=\"text/javascript\">
 checkAction('forum');
-</script>";
+</script>";*/
 		$form_container->output_row($lang->forumcleaner_source_forum." <em>*</em>", 
 									$lang->forumcleaner_source_forum_desc, 
 									$actions);
@@ -919,11 +937,11 @@ checkAction('forum');
 			{
 				if($row['enabled'])
 				{
-					$icon = "<a href=\"{$me['cfglink']}&amp;action=disable&amp;xid={$row['xid']}\"><img src=\"styles/{$page->style}/images/icons/tick.gif\" alt=\"{$lang->forumcleaner_enabled}\" title=\"{$lang->forumcleaner_enabled_title}\" style=\"vertical-align: middle;\" /></a>";
+					$icon = "<a href=\"{$me['cfglink']}&amp;action=disable&amp;xid={$row['xid']}\"><img src=\"styles/{$page->style}/images/icons/bullet_on.png\" alt=\"{$lang->forumcleaner_enabled}\" title=\"{$lang->forumcleaner_enabled_title}\" style=\"vertical-align: middle;\" /></a>";
 				}
 				else
 				{
-					$icon = "<a href=\"{$me['cfglink']}&amp;action=enable&amp;xid={$row['xid']}\"><img src=\"styles/{$page->style}/images/icons/cross.gif\" alt=\"{$lang->forumcleaner_disabled}\" title=\"{$lang->forumcleaner_disabled_title}\" style=\"vertical-align: middle;\" /></a>";
+					$icon = "<a href=\"{$me['cfglink']}&amp;action=enable&amp;xid={$row['xid']}\"><img src=\"styles/{$page->style}/images/icons/bullet_off.png\" alt=\"{$lang->forumcleaner_disabled}\" title=\"{$lang->forumcleaner_disabled_title}\" style=\"vertical-align: middle;\" /></a>";
 				}
 
 				$forum_name = $lang->forumcleaner_all_forums;
@@ -1364,7 +1382,7 @@ function forumcleaner_build_threadlist()
 	global $templates,$mybb;
 	$me = forumcleaner_info();
 
-	$messages = get_forumaction_desc($mybb->get_input('fid', 2),'threads');
+	$messages = get_forumaction_desc($mybb->get_input('fid', 1),'threads');
 	if (strlen($messages)) 
 	{
 		$subst = '';

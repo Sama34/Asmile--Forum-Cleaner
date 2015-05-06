@@ -34,85 +34,6 @@ function get_value($name,$default)
 	return $value ? $value : $default;
 }
 
-
-function delete_user($uid, $avatars = array()) 
-{
-
-	global $db,$mybb;
-
-	$sql = "";
-	if (is_array($uid))
-	{
-		$ulist = implode(",",$uid);
-		$sql = "uid IN ( ".$ulist." ) ";
-		$addsql = "OR adduid IN ( ".$ulist." ) ";
-		$fldsql = "ufid IN ( ".$ulist." )";
-        if ($mybb->version_code < 1600) 
-        {
-            $modsql = "uid IN ( ".$ulist. " )";
-        }
-        else
-        {
-		    $modsql = "id IN ( ".$ulist." ) and isgroup = '0'";
-        }
-	}
-	else
-	{
-		$sql = "uid = '{$uid}' ";
-		$addsql = "OR adduid = '{$uid}' ";
-		$fldsql = "ufid = {$uid} )";
-        if ($mybb->version_code < 1600)
-        {
-            $modsql = "uid = {$uid}";
-        }
-        else
-        {
-		    $modsql = "id = {$uid} and isgroup = '0'";
-        }
-	}
-
-	$prefix = "";
-	if ( defined('IN_ADMINCP') )
-	{
-		$prefix = "../";
-	}
-
-	if (!count($avatars)) 
-	{
-		$query = $db->simple_select("users","avatar",$sql." AND avatartype='upload'");
-		while ($avatar = $db->fetch_field($query,'avatar'))
-		{
-            $avatar = preg_replace("#\\?.+#","",$avatar);
-			unlink($prefix.$avatar);
-		}
-	}
-	else
-	{
-		foreach ( $avatars as $avatar )
-		{
-            $avatar = preg_replace("#\\?.+#","",$avatar);
-			unlink($prefix.$avatar);
-		}
-	}
-
-	// Delete the user
-	$db->update_query("posts", array('uid' => 0), $sql);
-	$db->delete_query("userfields", $fldsql);
-	$db->delete_query("privatemessages", $sql);
-	$db->delete_query("events", $sql);
-	$db->delete_query("moderators", $modsql);
-	$db->delete_query("forumsubscriptions", $sql);
-	$db->delete_query("threadsubscriptions", $sql);
-	$db->delete_query("sessions", $sql);
-	$db->delete_query("banned", $sql);
-	$db->delete_query("threadratings", $sql);
-	$db->delete_query("users", $sql);
-	$db->delete_query("joinrequests", $sql);
-	$db->delete_query("warnings", $sql);
-	$db->delete_query("reputation", $sql.$addsql);
-	$db->delete_query("awaitingactivation", $sql);
-}
-
 function task_forumcleaner($task) 
 {
 	global $db,$mybb, $plugins;
@@ -123,48 +44,39 @@ function task_forumcleaner($task)
 	$awaitingdays = get_value($sysname.'_awaitingdays',0);
 	$inactivedays = get_value($sysname.'_inactivedays',0);
 
-	$exceptions = array(4);// except Administrators
-
 	if($mybb->settings[$sysname.'_groupids'] == -1)
 	{
 		$exceptions = -1;
 	}
-	elseif($mybb->settings[$sysname.'_groupids'] != '')
+	else
 	{
+		$exceptions = array(4);// except Administrators
+
 		foreach (explode(',',$mybb->settings[$sysname.'_groupids']) as $gid) 
 		{
-			if ($gid = (int)$gid) 
-			{
-				array_push($exceptions,$gid);   
-			}
+			array_push($exceptions, (int)$gid);
 		}
+
+		$exceptions = implode(',', $exceptions);
 	}
 
 	$users = array();
-	$avatars = array();
 
 	// delete awaiting activation users
 	if ($awaitingdays) 
 	{
 		$breakdate = TIME_NOW - $awaitingdays * 24 * 60 * 60;
 
-		$query = $db->query("
-			SELECT a.uid AS uid, u.avatar AS avatar, u.avatartype AS avatartype
-			FROM ".TABLE_PREFIX."awaitingactivation a, ".TABLE_PREFIX."users u
-			WHERE a.type = 'r'
-			AND a.dateline < {$breakdate}
-			AND a.uid = u.uid
-			AND u.usergroup = '5'
-			LIMIT {$userlimit}
-		");   
+		$query = $db->simple_select(
+			'awaitingactivation a, LEFT JOIN '.TABLE_PREFIX.'users u ON (a.uid=u.uid)',
+			'a.uid',
+			"a.type='r' AND a.dateline<'{$breakdate}' AND u.usergroup='5'",
+			array('limit' => $userlimit)
+		);
 
-		while ($result = $db->fetch_array($query))
+		while ($uid = $db->fetch_field($query, 'uid'))
 		{
-			array_push($users, $result['uid']);
-			if ( $result['avatartype'] == 'upload' )
-			{
-				array_push($avatars,$result['avatar']);
-			}
+			array_push($users, (int)$uid);
 		}
 	} // delete awaiting activation users
 
@@ -173,49 +85,27 @@ function task_forumcleaner($task)
 	{
 		$breakdate = TIME_NOW - $inactivedays * 24 * 60 * 60;
 
-		$query = $db->query("
-			SELECT 
-				u.uid AS uid, 
-				u.usergroup AS usergroup,
-				u.additionalgroups AS additionalgroups,
-				u.displaygroup AS displaygroup,
-				u.avatar AS avatar,
-				u.avatartype AS avatartype
-			FROM ".TABLE_PREFIX."users u
-			WHERE u.lastvisit < '{$breakdate}'
-			AND u.uid NOT
-			IN (
+		$query = $db->simple_select(
+			'users u',
+			'u.uid, u.usergroup, u.additionalgroups, u.displaygroup',
+			"u.lastvisit<'{$breakdate}' AND u.uid NOT IN (
 				SELECT p.uid
 				FROM ".TABLE_PREFIX."posts p
-			) 
-		");
+			)",
+			array('limit' => $userlimit)
+		);
 
 		while ($result = $db->fetch_array($query))
 		{
-			// build user groups list
-			$ugroups = array($result['usergroup']);
-
 			if ((int)$result['displaygroup'])
 			{
-				array_push($ugroups,$result['displaygroup']);
-			}
-
-			foreach (explode(',',$result['additionalgroups']) as $ug) 
-			{
-				if ((int)$ug)
-				{
-					array_push($ugroups,$ug);
-				}
+				$result['additionalgroups'] .= ','.$result['displaygroup'];
 			}
 
 			// if not in exception list
-			if (!count(array_intersect($exceptions,$ugroups)) && $exceptions !== -1)
+			if ($exceptions !== -1 && !is_member($exceptions, array('usergroup' => $result['usergroup'], 'additionalgroups' => $result['additionalgroups'])))
 			{
 				array_push($users, $result['uid']);
-				if ( $result['avatartype'] == 'upload' )
-				{
-					array_push($avatars,$result['avatar']);
-				}
 				if (count($users) == $userlimit)
 				{
 					break;
@@ -224,20 +114,24 @@ function task_forumcleaner($task)
 		}
 	} // delete inactive users
 
-
+	if(is_object($plugins))
+	{
+		$args = array(
+			'users'	=> &$users,
+		);
+		$plugins->run_hooks('task_forumcleaner_users', $args);
+	}
 
 	// Delete and Update forum stats
 	if (count($users))
 	{
-		if(is_object($plugins))
-		{
-			$args = array(
-				'users'	=> &$users,
-			);
-			$plugins->run_hooks('task_forumcleaner_users', $args);
-		}
-		delete_user($users,$avatars);
-		update_stats(array('numusers' => '-'.count($users)));
+		// Set up user handler.
+		require_once MYBB_ROOT.'inc/datahandlers/user.php';
+		$userhandler = new UserDataHandler('delete');
+
+		// Delete the pruned users
+		$userhandler->delete_user($users, 0); // Default prune system uses $mybb->settings['prunethreads'] here but we are going to omit it for now since 0 is the plugin default value here
+
 		add_task_log($task, count($users). ' users deleted');
 	}
 
@@ -260,11 +154,11 @@ function task_forumcleaner($task)
 
 		if ( $action['lastpost'] == 1 )
 		{
-			$timecheck = "lastpost < '". (TIME_NOW - $action['agesecs']) . "'";
+			$timecheck = " AND lastpost < '". (TIME_NOW - $action['agesecs']) . "'";
 		}
 		else
 		{
-			$timecheck = "dateline < '". (TIME_NOW - $action['agesecs']) . "'";
+			$timecheck = " AND dateline < '". (TIME_NOW - $action['agesecs']) . "'";
 		}
 
 		$forum = "";
@@ -285,12 +179,10 @@ function task_forumcleaner($task)
 		// delete permanent redirects
 		if ($action['action'] == 'del_redirects') 
 		{ 
-			$db->delete_query('threads',
-				$forum .
-				"closed LIKE 'moved|%' AND " .
-				"deletetime = '0' AND " .
-				"sticky = '0' AND " .
-				$timecheck // no limit required, it's simple delete.
+			$db->delete_query(
+				'threads',
+				'tid',
+				$forum . "closed LIKE 'moved|%' AND deletetime = '0' AND sticky='0'" . $timecheck
 			);
 		}
 		else 
@@ -299,15 +191,14 @@ function task_forumcleaner($task)
 			$not_closed = "";
 			if ( $action['action']=='close' )
 			{
-				$not_closed = "closed <> '1' AND closed NOT LIKE 'moved|%' AND";
+				$not_closed = "closed <> '1' AND closed NOT LIKE 'moved|%' AND ";
 			}
 
-			$query = $db->simple_select('threads', 'tid', 
-				$forum . " 
-				{$not_closed} 
-				sticky = 0 AND
-				{$timecheck} 
-				LIMIT {$threadlimit}" 
+			$query = $db->simple_select(
+				'threads',
+				'tid',
+				$forum . $not_closed . "sticky='0'" . $timecheck,
+				array('limit' => $threadlimit)
 			);
 
 			// nothing to do. required, because $moderation->close_threads do not check number of values.
