@@ -990,7 +990,7 @@ checkAction('forum');
 
 				$table->construct_cell($popup->fetch(), array("class" => "align_center"));
 
-				$table->construct_row(array('class' => $page->get_alt_bg()));
+				$table->construct_row();
 			}
 		}
 		else 
