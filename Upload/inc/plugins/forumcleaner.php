@@ -1316,7 +1316,7 @@ function get_forumaction_desc($fid, $where)
 	);
 
 
-	if (count($forumaction_cache) and 
+	if (count($forumaction_cache) and isset($forumaction_cache[$where]) and 
 		count($forumaction_cache[$where]) and 
 		array_key_exists($fid,$forumaction_cache[$where]))
 	{
