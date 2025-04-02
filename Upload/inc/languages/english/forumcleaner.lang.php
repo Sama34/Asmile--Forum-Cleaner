@@ -25,16 +25,16 @@
  *  MYBB_ROOT/inc/languages/english/admin/forumcleaner.lang.php
  */
 
-$l['forumcleaner_topics_deleted'] = "Threads are deleted when the {1} is {2} {3} old.";
-$l['forumcleaner_topics_closed'] = "Threads are closed when the {1} is {2} {3} old.";
-$l['forumcleaner_topics_moved'] = "Threads are moved to \"{1}\" when the {2} is {3} {4} old.";
+$l['forumcleaner_topics_deleted'] = 'Threads are deleted when the {1} is {2} {3} old.';
+$l['forumcleaner_topics_closed'] = 'Threads are closed when the {1} is {2} {3} old.';
+$l['forumcleaner_topics_moved'] = 'Threads are moved to "{1}" when the {2} is {3} {4} old.';
 
-$l['forumcleaner_topics_firstpost'] = "first post";
-$l['forumcleaner_topics_lastpost'] = "last post";
+$l['forumcleaner_topics_firstpost'] = 'first post';
+$l['forumcleaner_topics_lastpost'] = 'last post';
 
-$l['forumcleaner_topics_hours'] = "hour(s)";
-$l['forumcleaner_topics_days'] = "day(s)";
-$l['forumcleaner_topics_weeks'] = "week(s)";
-$l['forumcleaner_topics_months'] = "month(s)";
+$l['forumcleaner_topics_hours'] = 'hour(s)';
+$l['forumcleaner_topics_days'] = 'day(s)';
+$l['forumcleaner_topics_weeks'] = 'week(s)';
+$l['forumcleaner_topics_months'] = 'month(s)';
 
 //$l['forumcleaner_'] = "";
