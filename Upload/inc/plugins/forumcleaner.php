@@ -51,7 +51,7 @@ define('ForumCleaner\SYSTEM_NAME', 'forumcleaner');
 
 define('ForumCleaner\ROOT', MYBB_ROOT . 'inc/plugins/ougc/ForumCleaner');
 
-define('ForumCleaner\DEBUG', true);
+define('ForumCleaner\DEBUG', false);
 
 defined('PLUGINLIBRARY') || define('PLUGINLIBRARY', MYBB_ROOT . 'inc/plugins/pluginlibrary.php');
 
@@ -79,7 +79,7 @@ $plugins->add_hook('admin_user_permissions', 'forumcleaner_admin_user_permission
 $plugins->add_hook('admin_load', 'forumcleaner_admin_load');
 
 $plugins->add_hook('build_forumbits_forum', 'forumcleaner_build_forumbits');
-$plugins->add_hook('forumdisplay_start', 'forumcleaner_build_threadlist');
+$plugins->add_hook('forumdisplay_threadlist', 'forumcleaner_build_threadlist');
 
 // Action to take to install the plugin.
 function forumcleaner_install(): void
@@ -1009,7 +1009,7 @@ function find_orphaned_avatars(): array
 function get_forumaction_desc(int $fid, string $where): string
 {
     static $forumaction_cache;
-    global $db, $lang, $forum_cache;
+    global $db, $lang, $forum_cache, $mybb;
 
     $lang->load('forumcleaner');
 
@@ -1057,12 +1057,13 @@ function get_forumaction_desc(int $fid, string $where): string
         1 => $lang->forumcleaner_topics_lastpost,
     ];
 
-
     if (count($forumaction_cache) && isset($forumaction_cache[$where]) &&
         count($forumaction_cache[$where]) &&
         array_key_exists($fid, $forumaction_cache[$where])) {
         $actions = [];
         $actions = $forumaction_cache[$where][$fid];
+
+        $prefix_cache = $mybb->cache->read('threadprefixes') ?? [];
 
         $ret = '';
         $comma = '';
@@ -1088,6 +1089,26 @@ function get_forumaction_desc(int $fid, string $where): string
                     $agetypes[$fa['agetype']]
                 );
             }
+
+            $threadLastEdit = (int)$fa['threadLastEdit'];
+
+            if ($threadLastEdit) {
+                $ret .= $lang->sprintf(
+                    $lang->forumcleaner_topics_last_edit,
+                    $threadLastEdit,
+                    $agetypes[$fa['threadLastEditType']]
+                );
+            }
+
+            $hasPrefixID = (int)$fa['hasPrefixID'];
+
+            if ($hasPrefixID !== -1 && !empty($prefix_cache[$hasPrefixID])) {
+                $ret .= $lang->sprintf(
+                    $lang->forumcleaner_topics_prefix,
+                    htmlspecialchars_uni(strip_tags($prefix_cache[$hasPrefixID]['prefix']))
+                );
+            }
+
             $comma = '<br />';
         }
         return $ret;
@@ -1100,28 +1121,28 @@ function forumcleaner_build_forumbits(array &$forum): void
 {
     global $templates;
 
+    $forum['ForumCleanerMessages'] = '';
+
     $messages = get_forumaction_desc((int)$forum['fid'], 'forums');
     if (strlen($messages)) {
-        $subst = '';
+        $subst = eval($templates->render(SYSTEM_NAME . '_forumbit'));
 
-        eval("\$subst = \"" . $templates->get(SYSTEM_NAME . '_forumbit') . "\";");
-
-        $forum[SYSTEM_NAME . '_forumbit'] = $subst;
+        $forum['ForumCleanerMessages'] = $subst;
     }
 }
 
 function forumcleaner_build_threadlist(): void
 {
     global $templates, $mybb;
-    $me = forumcleaner_info();
+    global $foruminfo;
+
+    $foruminfo['ForumCleanerMessages'] = '';
 
     $messages = get_forumaction_desc($mybb->get_input('fid', MyBB::INPUT_INT), 'threads');
     if (strlen($messages)) {
-        $subst = '';
+        $subst = eval($templates->render(SYSTEM_NAME . '_threadlist'));
 
-        eval("\$subst = \"" . $templates->get($me['sysname'] . '_threadlist') . "\";");
-
-        $mybb->input[$me['sysname'] . '_threadlist'] = $subst;
+        $foruminfo['ForumCleanerMessages'] = $subst;
     }
 }
 
