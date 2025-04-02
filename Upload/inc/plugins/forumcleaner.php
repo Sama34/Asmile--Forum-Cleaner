@@ -147,7 +147,7 @@ function get_forumaction_desc(int $fid, string $where): string
     if (!is_array($forumaction_cache)) {
         $query = $db->simple_select(
             SYSTEM_NAME,
-            '*',
+            'fid, threadslist_display, forumslist_display, action, age, agetype, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid',
             'enabled = 1 AND (forumslist_display = 1 OR threadslist_display = 1)'
         );
 
@@ -191,7 +191,6 @@ function get_forumaction_desc(int $fid, string $where): string
     if (count($forumaction_cache) && isset($forumaction_cache[$where]) &&
         count($forumaction_cache[$where]) &&
         array_key_exists($fid, $forumaction_cache[$where])) {
-        $actions = [];
         $actions = $forumaction_cache[$where][$fid];
 
         $ret = '';

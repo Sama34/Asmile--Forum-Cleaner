@@ -103,6 +103,11 @@ const TABLES_DATA = [
             'type' => 'TEXT',
             'null' => true
         ],
+        'softDeleteThreads' => [
+            'type' => 'TINYINT',
+            'unsigned' => true,
+            'default' => 1
+        ],
         'tofid' => [
             'type' => 'INT',
             'default' => -1

@@ -135,9 +135,12 @@ $l['forumcleaner_delete_redirects'] = 'Delete Permanent Redirects';
 $l['forumcleaner_thread_action'] = 'Thread Action';
 $l['forumcleaner_thread_action_desc'] = 'Select action to be performed on found thread.';
 
+$l['forumcleaner_thread_softDeleteThreads'] = 'Soft Delete Threads';
+$l['forumcleaner_thread_softDeleteThreads_desc'] = 'Soft delete threads instead of permanent delete. Required for "Delete Threads" Action.';
+
 $l['forumcleaner_target_forum'] = 'Target Forum';
 $l['forumcleaner_target_forum_desc'] = // modified in 2.5.0
-    "Select target forum to move found threads. Required for 'Move Threads' Action.";
+    'Select target forum to move found threads. Required for "Move Threads" Action.';
 
 $l['forumcleaner_forumslist_display'] = 'Display in Forum index';
 $l['forumcleaner_forumslist_display_desc'] = 'Display a message about this Action in Forum index. Ignored for Delete Permanent Redirects';
@@ -164,7 +167,9 @@ $l['forumcleaner_thread_age_text'] = '{1} {2} for the {3}.{4}{5}';
 
 $l['forumcleaner_thread_edit_time'] = '<br />Creation time or edit time: {1} {2}';
 
-$l['forumcleaner_thread_all_prefixes'] = '<br />Using prefix: {1}';
+$l['forumcleaner_thread_using_prefix'] = '<br />Using prefix: {1}';
+$l['forumcleaner_thread_using_prefix_any_none'] = 'Any or none';
+$l['forumcleaner_thread_using_prefix_none'] = '(no prefix)';
 
 $l['forumcleaner_forums'] = 'Forums to clean periodically';
 $l['forumcleaner_no_forums'] = 'No forums to display';

@@ -228,7 +228,11 @@ function forumcleaner_process_forumactions(): void
         if ($xid < 0) {
             $action = 'config';
         } else {
-            $result = $db->simple_select($systemName, '*', "xid = '{$xid}'");
+            $result = $db->simple_select(
+                $systemName,
+                'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid',
+                "xid = '{$xid}'"
+            );
             if ($db->num_rows($result)) {
                 $db_array = $db->fetch_array($result);
 
@@ -252,7 +256,11 @@ function forumcleaner_process_forumactions(): void
 
     if ($action == 'delete') {
         if ($xid >= 0) {
-            $result = $db->simple_select($systemName, '*', "xid = '$xid'");
+            $result = $db->simple_select(
+                $systemName,
+                'fid',
+                "xid = '$xid'"
+            );
             if ($expunge = $db->fetch_array($result)) {
                 log_admin_action(['xid' => $xid, 'fid' => $expunge['fid']]);
                 $db->delete_query($systemName, "xid = '{$xid}'", 1);
@@ -271,7 +279,11 @@ function forumcleaner_process_forumactions(): void
                 $update = 1;
             }
 
-            $result = $db->simple_select($systemName, '*', "xid = '$xid' AND enabled = {$find}");
+            $result = $db->simple_select(
+                $systemName,
+                'fid',
+                "xid = '$xid' AND enabled = {$find}"
+            );
             if ($expunge = $db->fetch_array($result)) {
                 log_admin_action(['xid' => $xid, 'fid' => $expunge['fid']]);
                 $db->update_query($systemName, ['enabled' => $update], "xid = '{$xid}'");
@@ -326,6 +338,7 @@ function forumcleaner_process_forumactions(): void
         $update_array['age'] = $mybb->get_input('age', MyBB::INPUT_INT);
         $update_array['agetype'] = $mybb->get_input('agetype');
         $update_array['action'] = $mybb->get_input('forumaction', MyBB::INPUT_ARRAY);
+        $update_array['softDeleteThreads'] = $mybb->get_input('softDeleteThreads', MyBB::INPUT_INT);
         $update_array['lastpost'] = $mybb->get_input('lastpost', MyBB::INPUT_INT);
         $update_array['threadLastEdit'] = $mybb->get_input('threadLastEdit', MyBB::INPUT_INT);
         $update_array['threadLastEditType'] = $mybb->get_input('threadLastEditType');
@@ -422,6 +435,7 @@ function forumcleaner_process_forumactions(): void
                 'fid' => '-1',
                 'tofid' => -1,
                 'forumaction' => ['close'],
+                'softDeleteThreads' => 1,
                 'age' => 1,
                 'agetype' => 'days',
                 'lastpost' => 1,
@@ -565,7 +579,7 @@ checkAction('forum');
                 (function () use ($mybb, $lang): array {
                     $prefix_cache = $mybb->cache->read('threadprefixes') ?? [];
 
-                    $selectObjects = [-1 => $lang->all_prefix, 0 => $lang->none];
+                    $selectObjects = [-1 => $lang->forumcleaner_thread_using_prefix_any_none, 0 => $lang->none];
 
                     foreach ($prefix_cache as $prefix) {
                         $selectObjects[$prefix['pid']] = htmlspecialchars_uni($prefix['prefix']);
@@ -589,6 +603,13 @@ checkAction('forum');
                 ['multiple' => true, 'id' => 'forumaction']
             ),
             'forumaction'
+        );
+
+        $form_container->output_row(
+            $lang->forumcleaner_thread_softDeleteThreads,
+            $lang->forumcleaner_thread_softDeleteThreads_desc,
+            $form->generate_yes_no_radio('softDeleteThreads', $update_array['softDeleteThreads']),
+            'softDeleteThreads'
         );
 
         $form_container->output_row(
@@ -716,14 +737,15 @@ checkAction('forum');
                             $row['threadLastEdit'],
                             $lang->{"forumcleaner_agetype_{$row['threadLastEditType']}"}
                         ) : '',
-                        $row['hasPrefixID'] ? (function (array $prefixIDs) use ($lang, $prefixesCache): string {
+                        ((int)$row['hasPrefixID'] !== -1) ? (function (array $prefixIDs) use (
+                            $lang,
+                            $prefixesCache
+                        ): string {
                             $prefixList = [];
 
-                            if (in_array(-1, $prefixIDs)) {
-                                $prefixList[] = $lang->all_prefix;
-                            } else {
+                            if (!in_array(-1, $prefixIDs)) {
                                 if (in_array(0, $prefixIDs)) {
-                                    $prefixList[] = $lang->none;
+                                    $prefixList[] = $lang->forumcleaner_thread_using_prefix_none;
                                 }
 
                                 foreach ($prefixesCache as $prefixData) {
@@ -734,7 +756,7 @@ checkAction('forum');
                             }
 
                             return $lang->sprintf(
-                                $lang->forumcleaner_thread_all_prefixes,
+                                $lang->forumcleaner_thread_using_prefix,
                                 implode(', ', $prefixList)
                             );
                         })(

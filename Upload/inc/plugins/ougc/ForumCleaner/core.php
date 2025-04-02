@@ -204,7 +204,11 @@ function executeTask(array &$taskData = []): void
     $existingForumIDs = array_column(cache_forums(), 'fid');
 
     // Get action list
-    $forumactions = $db->simple_select(SYSTEM_NAME, '*', "enabled = '1'");
+    $forumactions = $db->simple_select(
+        SYSTEM_NAME,
+        'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid',
+        "enabled = '1'"
+    );
 
     while ($action = $db->fetch_array($forumactions)) {
         $whereClauses = [];
@@ -288,11 +292,15 @@ function executeTask(array &$taskData = []): void
         }
 
         if (in_array('delete', $forumActions)) {
-            foreach ($threadIDs as $threadID) {
-                $moderation->delete_thread($threadID);
+            if (empty($action['softDeleteThreads'])) {
+                foreach ($threadIDs as $threadID) {
+                    $moderation->delete_thread($threadID);
+                }
+
+                continue;
             }
 
-            continue;
+            $moderation->soft_delete_threads($threadIDs);
         }
 
         if (in_array('move', $forumActions) && in_array($action['tofid'], $existingForumIDs)) {
