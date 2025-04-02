@@ -25,15 +25,16 @@
  *   MYBB_ROOT/inc/languages/english/forumcleaner.lang.php
  */
 
+declare(strict_types=1);
 
-function get_value($name, $default)
+function get_value(string $name, int $default): int
 {
     global $mybb;
-    $value = (int)$mybb->settings[$name];
-    return $value ? $value : $default;
+
+    return (int)($mybb->settings[$name] ?? $default);
 }
 
-function task_forumcleaner($task)
+function task_forumcleaner(array &$task): array
 {
     global $db, $mybb, $plugins;
 
@@ -49,7 +50,7 @@ function task_forumcleaner($task)
         $exceptions = [4];// except Administrators
 
         foreach (explode(',', $mybb->settings[$sysname . '_groupids']) as $gid) {
-            array_push($exceptions, (int)$gid);
+            $exceptions[] = (int)$gid;
         }
 
         $exceptions = implode(',', $exceptions);
@@ -69,7 +70,7 @@ function task_forumcleaner($task)
         );
 
         while ($uid = $db->fetch_field($query, 'uid')) {
-            array_push($users, (int)$uid);
+            $users[] = (int)$uid;
         }
     } // delete awaiting activation users
 
@@ -93,11 +94,8 @@ function task_forumcleaner($task)
             }
 
             // if not in exception list
-            if ($exceptions !== -1 && !is_member(
-                    $exceptions,
-                    ['usergroup' => $result['usergroup'], 'additionalgroups' => $result['additionalgroups']]
-                )) {
-                array_push($users, $result['uid']);
+            if (!is_member($exceptions, $result)) {
+                $users[] = $result['uid'];
                 if (count($users) == $userlimit) {
                     break;
                 }
@@ -180,6 +178,14 @@ function task_forumcleaner($task)
                 ['limit' => $threadlimit]
             );
 
+            _dump(
+                $db->num_rows($query),
+                'threads',
+                'tid',
+                $forum . $not_closed . "sticky='0'" . $timecheck,
+                ['limit' => $threadlimit]
+            );
+
             // nothing to do. required, because $moderation->close_threads do not check number of values.
             if (!$db->num_rows($query)) {
                 continue;
@@ -189,11 +195,11 @@ function task_forumcleaner($task)
                 $tids = [];
 
                 while ($result = $db->fetch_array($query)) {
-                    array_push($tids, $result['tid']);
+                    $tids[] = $result['tid'];
                 }
 
                 $moderation->close_threads($tids);
-            } elseif ($action['action'] == 'move' or $action['action'] == 'delete') {
+            } elseif ($action['action'] == 'move' || $action['action'] == 'delete') {
                 while ($result = $db->fetch_array($query)) {
                     if ($action['action'] == 'move') {
                         if (strlen($forum)) // if looking not for all forums
@@ -210,4 +216,6 @@ function task_forumcleaner($task)
     }
 
     add_task_log($task, 'The Forum Cleaning task successfully ran.');
+
+    return $task;
 }// function task_forumcleaner($task)

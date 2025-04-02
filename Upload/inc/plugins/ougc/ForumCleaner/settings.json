@@ -1,0 +1,22 @@
+{
+  "threadlimit": {
+    "optionscode": "numeric",
+    "value": 30
+  },
+  "userlimit": {
+    "optionscode": "numeric",
+    "value": 50
+  },
+  "awaitingdays": {
+    "optionscode": "numeric",
+    "value": 0
+  },
+  "inactivedays": {
+    "optionscode": "numeric",
+    "value": 0
+  },
+  "groupids": {
+    "optionscode": "groupselect",
+    "value": "3,4,6"
+  }
+}

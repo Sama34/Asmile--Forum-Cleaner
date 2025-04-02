@@ -52,7 +52,7 @@ $l['setting_forumcleaner_inactivedays'] = 'Grace period for inactive users';
 $l['setting_forumcleaner_inactivedays_desc'] = 'Input days of Grace period for inactive users (with no posts). After this period from last visit users will be deleted.<br />No users will be deleted if set to 0.';
 
 $l['setting_forumcleaner_groupids'] = 'Group exception list for inactive users';
-$l['setting_forumcleaner_groupids_desc'] = 'Administrators will be not deleted as inactive users. Here you can add additional exceptions.<br />Input comma separated list of Group IDs.';
+$l['setting_forumcleaner_groupids_desc'] = 'Administrators will be not deleted as inactive users. Here you can add additional exceptions.';
 
 
 $l['forumcleaner_task_desc'] = 'Manage threads on specified forums when they reach a specified age. Delete inactive and not activated users.';

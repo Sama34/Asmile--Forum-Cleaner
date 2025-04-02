@@ -30,56 +30,35 @@
  * and lots of Copy&Paste's from Admin CP tools
  */
 
+declare(strict_types=1);
 
 // Don't allow direct initialization.
+use function ForumCleaner\Admin\pluginActivate;
+use function ForumCleaner\Admin\pluginDeactivate;
+use function ForumCleaner\Admin\pluginInfo;
+use function ForumCleaner\Admin\pluginIsInstalled;
+use function ForumCleaner\Admin\pluginUninstall;
+
+use const ForumCleaner\ROOT;
+
 if (!defined('IN_MYBB')) {
     die('Nope.');
 }
 
-// PLUGINLIBRARY
-defined('PLUGINLIBRARY') or define('PLUGINLIBRARY', MYBB_ROOT . 'inc/plugins/pluginlibrary.php');
+define('ForumCleaner\SYSTEM_NAME', 'forumcleaner');
+
+define('ForumCleaner\ROOT', MYBB_ROOT . 'inc/plugins/ougc/ForumCleaner');
+
+defined('PLUGINLIBRARY') || define('PLUGINLIBRARY', MYBB_ROOT . 'inc/plugins/pluginlibrary.php');
+
+if (defined('IN_ADMINCP')) {
+    require_once ROOT . '/admin.php';
+}
 
 // The info for this plugin.
-function forumcleaner_info()
+function forumcleaner_info(): array
 {
-    global $lang;
-
-    $lang->load('forumcleaner');
-
-    $language_fine = 1;
-
-    if (defined('IN_ADMINCP') && !strlen($lang->setting_group_forumcleaner)) {
-        $language_fine = 0;
-    } elseif (!defined('IN_ADMINCP') && !strlen($lang->forumcleaner_topics_closed)) {
-        $language_fine = 0;
-    }
-
-    if (!$language_fine) {
-        error('<strong>No appropriate language file loaded !</strong>', 'Forum Cleaner error');
-    }
-
-    return [
-        'name' => 'Forum Cleaner',
-        'avaname' => $lang->forumcleaner_avaname,
-        'description' => $lang->forumcleaner_desc,
-        'avadesc' => $lang->forumcleaner_avadesc,
-        'website' => 'http://community.mybb.com/thread-77074.html',
-        'author' => 'Andriy Smilyanets',
-        'authorsite' => 'http://community.mybb.com/user-18581.html',
-        'version' => '2.5.1',
-        'compatibility' => '18*',
-        'codename' => 'ougc_forumcleaner',
-        'sysname' => 'forumcleaner',
-        'avasysname' => 'orphanavatars',
-        'cfglink' => 'index.php?module=forum-forumcleaner',
-        'avalink' => 'index.php?module=user-orphanavatars',
-        'files' => [
-            'inc/plugins/forumcleaner.php',
-            'inc/tasks/forumcleaner.php',
-            'inc/languages/english/admin/forumcleaner.lang.php',
-            'inc/languages/english/forumcleaner.lang.php',
-        ],
-    ];
+    return pluginInfo();
 }
 
 global $plugins;
@@ -99,242 +78,42 @@ $plugins->add_hook('build_forumbits_forum', 'forumcleaner_build_forumbits');
 $plugins->add_hook('forumdisplay_start', 'forumcleaner_build_threadlist');
 
 // Action to take to install the plugin.
-function forumcleaner_install()
+function forumcleaner_install(): void
 {
-    global $db, $lang;
-
-    // Retrieve plugin info.
-    $me = forumcleaner_info();
-
-    // Create the table for the settings.
-    $result = $db->query(
-        '
-		CREATE TABLE IF NOT EXISTS `' . TABLE_PREFIX . "{$me['sysname']}`
-		(
-			`xid` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-			`fid` TEXT NOT NULL DEFAULT '',
-			`enabled` BOOL NOT NULL DEFAULT 1,
-			`threadslist_display` BOOL NOT NULL DEFAULT 0,
-			`forumslist_display` BOOL NOT NULL DEFAULT 0,
-			`action` VARCHAR(20) NOT NULL,
-			`age` INT NOT NULL DEFAULT 0,
-			`agetype` VARCHAR(8) NOT NULL,
-			`agesecs` INT NOT NULL DEFAULT 0,
-			`lastpost` BOOL NOT NULL DEFAULT 1,
-			`tofid` INT NOT NULL DEFAULT -1
-		)
-	"
-    );
-
-    // Log.
-    log_admin_action($me['name']);
+    pluginActivate();
 }
 
 // Return TRUE if plugin is installed, FALSE otherwise.
-function forumcleaner_is_installed()
+function forumcleaner_is_installed(): bool
 {
-    global $db;
-
-    $me = forumcleaner_info();
-
-    // Plugin is installed if table exists.
-    return $db->table_exists($me['sysname']);
+    return pluginIsInstalled();
 }
 
 // Action to take to activate the plugin.
-function forumcleaner_activate()
+function forumcleaner_activate(): void
 {
-    global $message, $lang, $PL;
-    $PL or require_once PLUGINLIBRARY;
-
-    $me = forumcleaner_info();
-
-    // Add task if task file exists, warn otherwise.
-    if (!file_exists(MYBB_ROOT . "inc/tasks/{$me['sysname']}.php")) {
-        $message = $lang->sprintf(
-            $lang->forumcleaner_task_file_not_exist,
-            $me['name'],
-            '<code>inc/tasks/' . $me['sysname'] . '.php</code>'
-        );
-    } else {
-        forumcleaner_add_task();
-    }
-
-    // Set admin permissions for tab.
-    change_admin_permission('forum', $me['sysname']);
-    change_admin_permission('user', $me['avasysname']);
-
-    // upgrade from 2.3 to 2.4
-
-    // table upgrade tested only for mysql,
-    // I have no other database engines to test them, so if it not compatible with others,
-    // feel free to modify this or add columns manually
-    global $db;
-
-    if (!$db->field_exists('threadslist_display', $me['sysname'])) {
-        $db->add_column($me['sysname'], 'threadslist_display', 'BOOL NOT NULL DEFAULT 0');
-    }
-    if (!$db->field_exists('forumslist_display', $me['sysname'])) {
-        $db->add_column($me['sysname'], 'forumslist_display', 'BOOL NOT NULL DEFAULT 0');
-    }
-
-    // upgrade from 2.4 to 2.5
-    // table upgrade tested only for mysql,
-    // I have no other database engines to test them, so if it not compatible with others,
-    // feel free to modify this or modify 'fid' column type from int to text manually
-    $db->modify_column($me['sysname'], 'fid', "TEXT NOT NULL DEFAULT ''");
-
-    // Add settings
-    $PL->settings($me['sysname'], $lang->setting_group_forumcleaner, $lang->setting_group_forumcleaner_desc, [
-        'threadlimit' => [
-            'title' => $lang->setting_forumcleaner_threadlimit,
-            'description' => $lang->setting_forumcleaner_threadlimit_desc,
-            'optionscode' => 'text',
-            'value' => 30,
-        ],
-        'userlimit' => [
-            'title' => $lang->setting_forumcleaner_userlimit,
-            'description' => $lang->setting_forumcleaner_userlimit_desc,
-            'optionscode' => 'text',
-            'value' => 50,
-        ],
-        'awaitingdays' => [
-            'title' => $lang->setting_forumcleaner_awaitingdays,
-            'description' => $lang->setting_forumcleaner_awaitingdays_desc,
-            'optionscode' => 'text',
-            'value' => 0,
-        ],
-        'inactivedays' => [
-            'title' => $lang->setting_forumcleaner_inactivedays,
-            'description' => $lang->setting_forumcleaner_inactivedays_desc,
-            'optionscode' => 'text',
-            'value' => 0,
-        ],
-        'groupids' => [
-            'title' => $lang->setting_forumcleaner_groupids,
-            'description' => $lang->setting_forumcleaner_groupids_desc,
-            'optionscode' => 'groupselect',
-            'value' => '3,4,6',
-        ]
-    ]);
-
-    // add templates if not exist
-    forumcleaner_addtemplates();
-    // end of upgrade code
-
-    require_once MYBB_ROOT . 'inc/adminfunctions_templates.php';
-
-    //	modify default templates
-    find_replace_templatesets(
-        'forumbit_depth2_forum',
-        '#\\{.modlist}#',
-        '{\$forum[\'' . $me['sysname'] . '_forumbit\']}{\$modlist}'
-    );
-    find_replace_templatesets(
-        'forumdisplay_threadlist',
-        '#^#',
-        '{\$mybb->input[\'' . $me['sysname'] . '_threadlist\']}'
-    );
+    pluginActivate();
 }
 
-
-function forumcleaner_addtemplates()
+function forumcleaner_addtemplates(): void
 {
-    global $db, $PL;
-    $PL or require_once PLUGINLIBRARY;
-
-    $me = forumcleaner_info();
-
-    // Add template group
-    $PL->templates($me['sysname'], $me['name'], [
-        'forumbit' => '<br /><strong>{$messages}</strong>',
-        'threadlist' => '<div class="pm_alert"><strong>{$messages}</strong></div>',
-    ]);
+    pluginDeactivate();
 }
-
 
 // Action to take to deactivate the plugin.
-function forumcleaner_deactivate()
+function forumcleaner_deactivate(): void
 {
-    global $db, $mybb;
-
-    $me = forumcleaner_info();
-
-    // Disable task
-    $db->update_query('tasks', ['enabled' => 0], "file = '{$me['sysname']}'");
-
-    // recover templates
-    require_once MYBB_ROOT . 'inc/adminfunctions_templates.php';
-    find_replace_templatesets('forumbit_depth2_forum', '#\\{.forum\\[.' . $me['sysname'] . '_forumbit.\\]}#', '', 0);
-    find_replace_templatesets(
-        'forumdisplay_threadlist',
-        '#\\{.mybb->input\\[.' . $me['sysname'] . '_threadlist.\\]}#',
-        '',
-        0
-    );
-
-    // Change admin permission.
-    change_admin_permission('forum', $me['sysname'], 0);
-    change_admin_permission('user', $me['avasysname'], 0);
+    pluginDeactivate();
 }
 
 // Action to take to uninstall the plugin.
-function forumcleaner_uninstall()
+function forumcleaner_uninstall(): void
 {
-    global $db, $lang, $PL, $mybb;
-    $PL or require_once PLUGINLIBRARY;
-
-    $me = forumcleaner_info();
-
-    // Drop database.
-    $db->drop_table($me['sysname']);
-
-    $PL->settings_delete($me['sysname']);
-    $PL->templates_delete('ougcawards');
-
-    // Remove task.
-
-    // Switch modules and actions.
-    $prev_module = $mybb->get_input('module');
-    $prev_action = $mybb->get_input('action');
-    $mybb->input['module'] = 'tools-tasks';
-    $mybb->input['action'] = 'delete';
-
-    // Fetch ID and title.
-    $result = $db->simple_select('tasks', 'tid, title', "file = '{$me['sysname']}'");
-    while ($task = $db->fetch_array($result)) {
-        // Log.
-        log_admin_action($task['tid'], $task['title']);
-    }
-
-    // Delete.
-    $result = $db->delete_query('tasks', "file = '{$me['sysname']}'");
-
-    // Reset module.
-    $mybb->input['module'] = $prev_module;
-
-    // Reset action.
-    $mybb->input['action'] = $prev_action;
-
-    // Log.
-    log_admin_action($me['name']);
-
-    // Remove admin permission.
-    change_admin_permission('forum', $me['sysname'], -1);
-    change_admin_permission('user', $me['avasysname'], -1);
-
-    flash_message(
-        $lang->sprintf(
-            $lang->forumcleaner_plugin_uninstalled,
-            $me['name'],
-            '<ul><li>' . join('</li><li>', $me['files']) . '</li></ul>'
-        ),
-        'success'
-    );
+    pluginUninstall();
 }
 
 // Add a menu item in the AdminCP.
-function forumcleaner_admin_forum_menu(&$sub_menu)
+function forumcleaner_admin_forum_menu(array &$sub_menu): array
 {
     $me = forumcleaner_info();
     $sub_menu[] = [
@@ -342,29 +121,35 @@ function forumcleaner_admin_forum_menu(&$sub_menu)
         'title' => $me['name'],
         'link' => $me['cfglink'],
     ];
+
+    return $sub_menu;
 }
 
 // The file to use for configuring the plugin.
-function forumcleaner_admin_forum_action_handler(&$actions)
+function forumcleaner_admin_forum_action_handler(array &$actions): array
 {
     $me = forumcleaner_info();
     $actions[$me['sysname']] = [
         'active' => $me['sysname'],
         'file' => 'settings.php'
     ];
+
+    return $actions;
 }
 
 // The text for the entry in the admin permissions page.
-function forumcleaner_admin_forum_permissions(&$admin_permissions)
+function forumcleaner_admin_forum_permissions(array &$admin_permissions): array
 {
     global $lang;
 
     $me = forumcleaner_info();
 
     $admin_permissions[$me['sysname']] = $lang->sprintf($lang->forumcleaner_can_manage, $me['name']);
+
+    return $admin_permissions;
 }
 
-function get_seconds($age, $type)
+function get_seconds(int $age, string $type): float
 {
     $age_type_secs = [
         'hours' => 60 * 60,
@@ -376,7 +161,7 @@ function get_seconds($age, $type)
     return $age * $age_type_secs[$type];
 }
 
-function forumcleaner_validate_action(&$action)
+function forumcleaner_validate_action(array &$action): array
 {
     global $forum_cache, $lang, $db, $mybb;
 
@@ -392,7 +177,8 @@ function forumcleaner_validate_action(&$action)
         $errors['invalid_agetype'] = $lang->forumcleaner_invalid_agetype;
     }
 
-    $action['agesecs'] = get_seconds($action['age'], $action['agetype']);
+    _dump($action);
+    $action['agesecs'] = get_seconds((int)$action['age'], $action['agetype']);
 
     if (!in_array($action['action'], ['delete', 'close', 'move', 'del_redirects'])) {
         $errors['invalid_action'] = $lang->forumcleaner_invalid_action;
@@ -440,13 +226,12 @@ function forumcleaner_validate_action(&$action)
     return $errors;
 }
 
-
 // simple sort key for forums
-function get_sort_key($fid)
+function get_sort_key(int $fid): string
 {
-    global $forum_cache;
-
     if ($fid) {
+        global $forum_cache;
+
         return get_sort_key($forum_cache[$fid]['pid']) . sprintf('%04d', $forum_cache[$fid]['disporder']);
     } else {
         return '';
@@ -454,7 +239,7 @@ function get_sort_key($fid)
 }
 
 // to sort action list
-function actions_cmp($a, $b)
+function actions_cmp(array $a, array $b): int
 {
     $cmp = strcmp($a['sort_key'], $b['sort_key']);
     if ($cmp != 0) {
@@ -470,7 +255,7 @@ function actions_cmp($a, $b)
 }
 
 // Configuration page.
-function forumcleaner_admin_load()
+function forumcleaner_admin_load(): void
 {
     global $page;
 
@@ -483,7 +268,7 @@ function forumcleaner_admin_load()
     }
 } // function forumcleaner_admin_load() 
 
-function forumcleaner_process_forumactions()
+function forumcleaner_process_forumactions(): void
 {
     global $db, $page, $mybb, $forum_cache, $lang;
 
@@ -537,8 +322,8 @@ function forumcleaner_process_forumactions()
 
     $xid = '-1';
 
-    if ($mybb->get_input('xid', 1) > 0) {
-        $xid = $mybb->get_input('xid', 1);
+    if ($mybb->get_input('xid', MyBB::INPUT_INT) > 0) {
+        $xid = $mybb->get_input('xid', MyBB::INPUT_INT);
     }
 
     $db_array = [];
@@ -578,7 +363,7 @@ function forumcleaner_process_forumactions()
         admin_redirect($me['cfglink']);
     }
 
-    if ($action == 'disable' or $action == 'enable') {
+    if ($action == 'disable' || $action == 'enable') {
         if ($xid >= 0) {
             $find = 1;
             $update = 0;
@@ -621,14 +406,14 @@ function forumcleaner_process_forumactions()
             $action = 'add';
         }
         if ($mybb->get_input('forum_type') == 'custom') {
-            if (count($mybb->get_input('forum_1_forums', 2)) < 1) {
+            if (count($mybb->get_input('forum_1_forums', MyBB::INPUT_ARRAY)) < 1) {
                 $errors[] = $lang->forumcleaner_no_forum_selected;
             }
             $forum_checked['custom'] = "checked=\"checked\"";
 
-            if ($mybb->get_input('forum_1_forums', 2)) {
+            if ($mybb->get_input('forum_1_forums', MyBB::INPUT_ARRAY)) {
                 $checked = [];
-                foreach ($mybb->get_input('forum_1_forums', 2) as $fid) {
+                foreach ($mybb->get_input('forum_1_forums', MyBB::INPUT_ARRAY) as $fid) {
                     $checked[] = (int)$fid;
                 }
                 $update_array['fid'] = implode(',', $checked);
@@ -639,15 +424,15 @@ function forumcleaner_process_forumactions()
             $update_array['fid'] = '-1';
         }
 
-        $update_array['age'] = $mybb->get_input('age', 1);
+        $update_array['age'] = $mybb->get_input('age', MyBB::INPUT_INT);
         $update_array['agetype'] = $mybb->get_input('agetype');
         $update_array['action'] = $mybb->input['forumaction'];
-        $update_array['lastpost'] = $mybb->get_input('lastpost', 1);
-        $update_array['forumslist_display'] = $mybb->get_input('forumslist_display', 1);
-        $update_array['threadslist_display'] = $mybb->get_input('threadslist_display', 1);
+        $update_array['lastpost'] = $mybb->get_input('lastpost', MyBB::INPUT_INT);
+        $update_array['forumslist_display'] = $mybb->get_input('forumslist_display', MyBB::INPUT_INT);
+        $update_array['threadslist_display'] = $mybb->get_input('threadslist_display', MyBB::INPUT_INT);
 
         if ($update_array['action'] == 'move') {
-            $update_array['tofid'] = $mybb->get_input('tofid', 1);
+            $update_array['tofid'] = $mybb->get_input('tofid', MyBB::INPUT_INT);
         }
 
         if (!count($errors)) {
@@ -711,7 +496,7 @@ function forumcleaner_process_forumactions()
 
     $page->output_nav_tabs($navtabs, $action);
 
-    if ($action == 'add' or $action == 'edit') {
+    if ($action == 'add' || $action == 'edit') {
         // Create form.
         $form = new Form("{$me['cfglink']}&amp;action={$action}", 'post');
 
@@ -759,7 +544,7 @@ function forumcleaner_process_forumactions()
 						<td valign=\"top\"><small>{$lang->forums_colon}</small></td>
 						<td>" . $form->generate_forum_select(
                 'forum_1_forums[]',
-                $mybb->get_input('forum_1_forums', 2),
+                $mybb->get_input('forum_1_forums', MyBB::INPUT_ARRAY),
                 ['id' => 'forums', 'multiple' => true, 'size' => 5]
             ) . "</td>
 					</tr>
@@ -806,7 +591,7 @@ function forumcleaner_process_forumactions()
 </label></dt>
 <dd style=\"margin-top: 4px;\" id=\"forum_2\" class=\"forums\">".
 $form->generate_forum_select('forum_1_forums[]',
-    $mybb->get_input('forum_1_forums', 2),
+    $mybb->get_input('forum_1_forums', \MyBB::INPUT_ARRAY),
     array('multiple' => true, 'size' => 10)).
 "
 </dd>
@@ -910,9 +695,9 @@ checkAction('forum');
                 } else {
                     $forums = explode(',', $row['fid']);
                     $fid = array_shift($forums);
-                    $row['sort_key'] = get_sort_key($fid) . ' ' . $forum_cache[$fid]['name'];
+                    $row['sort_key'] = get_sort_key((int)$fid) . ' ' . $forum_cache[$fid]['name'];
                 }
-                array_push($rows, $row);
+                $rows[] = $row;
             }
             // sort actions by forum and treads age
             usort($rows, 'actions_cmp');
@@ -988,60 +773,8 @@ checkAction('forum');
     $page->output_footer(true);
 }// function forumcleaner_process_forumactions()
 
-// Function to add task to task system.
-function forumcleaner_add_task()
-{
-    global $db, $mybb, $lang;
-
-    require_once MYBB_ROOT . 'inc/functions_task.php';
-
-    $me = forumcleaner_info();
-
-    $result = $db->simple_select('tasks', 'count(tid) as count', "file = '{$me['sysname']}'");
-    if (!$db->fetch_field($result, 'count')) {
-        // Switch modules and actions.
-        $prev_module = $mybb->get_input('module');
-        $prev_action = $mybb->get_input('action');
-        $mybb->input['module'] = 'tools-tasks';
-        $mybb->input['action'] = 'add';
-
-        // Create task. Have it run every 15 minutes by default.
-        $insert_array = [
-            'title' => $me['name'],
-            'description' => $lang->forumcleaner_task_desc,
-            'file' => $me['sysname'],
-            'minute' => '3,18,33,48',
-            'hour' => '*',
-            'day' => '*',
-            'month' => '*',
-            'weekday' => '*',
-            'lastrun' => 0,
-            'enabled' => 1,
-            'logging' => 1,
-            'locked' => 0,
-        ];
-        $insert_array['nextrun'] = fetch_next_run($insert_array);
-        $result = $db->insert_query('tasks', $insert_array);
-        $tid = $db->insert_id();
-
-        log_admin_action($tid, $me['name']);
-
-        // Reset module and action.
-        $mybb->input['module'] = $prev_module;
-        $mybb->input['action'] = $prev_action;
-
-        return true;
-    } else {
-        // Enable task
-        $db->update_query('tasks', ['enabled' => 1], "file = '{$me['sysname']}'");
-
-        return true;
-    }
-}
-
-
 // Add a menu item in the AdminCP.
-function forumcleaner_admin_user_menu(&$sub_menu)
+function forumcleaner_admin_user_menu(array &$sub_menu): array
 {
     $me = forumcleaner_info();
     $sub_menu[] = [
@@ -1049,30 +782,35 @@ function forumcleaner_admin_user_menu(&$sub_menu)
         'title' => $me['avaname'],
         'link' => $me['avalink'],
     ];
+
+    return $sub_menu;
 }
 
 // The file to use for configuring the plugin.
-function forumcleaner_admin_user_action_handler(&$actions)
+function forumcleaner_admin_user_action_handler(array &$actions): array
 {
     $me = forumcleaner_info();
     $actions[$me['avasysname']] = [
         'active' => $me['avasysname'],
         'file' => 'settings.php'
     ];
+
+    return $actions;
 }
 
 // The text for the entry in the admin permissions page.
-function forumcleaner_admin_user_permissions(&$admin_permissions)
+function forumcleaner_admin_user_permissions(array &$admin_permissions): array
 {
     global $lang;
 
     $me = forumcleaner_info();
 
     $admin_permissions[$me['avasysname']] = $lang->sprintf($lang->forumcleaner_can_manage, $me['avaname']);
+
+    return $admin_permissions;
 }
 
-
-function forumcleaner_process_orphanavatars()
+function forumcleaner_process_orphanavatars(): void
 {
     global $db, $page, $mybb, $lang;
 
@@ -1130,7 +868,7 @@ function forumcleaner_process_orphanavatars()
             }
 
             foreach ($files as $file) {
-                @unlink($avatarpath . $file);
+                unlink($avatarpath . $file);
             }
 
             flash_message($lang->sprintf($lang->forumcleaner_avatars_deleted, $numfiles), 'success');
@@ -1146,8 +884,7 @@ function forumcleaner_process_orphanavatars()
     $page->output_footer(true);
 }// function forumcleaner_process_orphanavatars()
 
-
-function find_orphaned_avatars()
+function find_orphaned_avatars(): array
 {
     global $mybb, $db;
 
@@ -1168,7 +905,7 @@ function find_orphaned_avatars()
         $user_notfinished = 1;
 
         while ($file_notfinished || $user_notfinished) {
-            if ($file_notfinished and ($file = @readdir($dir))) {
+            if ($file_notfinished and ($file = readdir($dir))) {
                 if (array_key_exists($file, $user_avatars)) {
                     unset($user_avatars[$file]);
                 } else {
@@ -1204,9 +941,8 @@ function find_orphaned_avatars()
     }
 }
 
-
 // forms message to user with Forum Action description
-function get_forumaction_desc($fid, $where)
+function get_forumaction_desc(int $fid, string $where): string
 {
     static $forumaction_cache;
     global $db, $lang, $forum_cache;
@@ -1269,7 +1005,7 @@ function get_forumaction_desc($fid, $where)
         $comma = '';
         foreach ($actions as $fa) {
             $ret .= $comma;
-            if ($fa['action'] == 'close' or $fa['action'] == 'delete') {
+            if ($fa['action'] == 'close' || $fa['action'] == 'delete') {
                 $ret .= $lang->sprintf(
                     $forumactions[$fa['action']],
                     $lastpost[$fa['lastpost']],
@@ -1297,13 +1033,12 @@ function get_forumaction_desc($fid, $where)
     }
 }
 
-
-function forumcleaner_build_forumbits(&$forum)
+function forumcleaner_build_forumbits(array &$forum): void
 {
     global $templates;
     $me = forumcleaner_info();
 
-    $messages = get_forumaction_desc($forum['fid'], 'forums');
+    $messages = get_forumaction_desc((int)$forum['fid'], 'forums');
     if (strlen($messages)) {
         $subst = '';
 
@@ -1313,12 +1048,12 @@ function forumcleaner_build_forumbits(&$forum)
     }
 }
 
-function forumcleaner_build_threadlist()
+function forumcleaner_build_threadlist(): void
 {
     global $templates, $mybb;
     $me = forumcleaner_info();
 
-    $messages = get_forumaction_desc($mybb->get_input('fid', 1), 'threads');
+    $messages = get_forumaction_desc($mybb->get_input('fid', MyBB::INPUT_INT), 'threads');
     if (strlen($messages)) {
         $subst = '';
 
