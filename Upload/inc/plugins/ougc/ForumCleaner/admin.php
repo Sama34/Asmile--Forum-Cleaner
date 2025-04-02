@@ -100,8 +100,8 @@ const TABLES_DATA = [
             'default' => ''
         ],
         'hasPrefixID' => [
-            'type' => 'INT',
-            'default' => -1
+            'type' => 'TEXT',
+            'null' => true
         ],
         'tofid' => [
             'type' => 'INT',

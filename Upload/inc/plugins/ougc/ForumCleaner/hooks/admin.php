@@ -231,6 +231,8 @@ function forumcleaner_process_forumactions(): void
             $result = $db->simple_select($systemName, '*', "xid = '{$xid}'");
             if ($db->num_rows($result)) {
                 $db_array = $db->fetch_array($result);
+
+                $db_array['hasPrefixID'] = explode(',', $db_array['hasPrefixID']);
             } else {
                 $action = 'config';
             }
@@ -325,7 +327,7 @@ function forumcleaner_process_forumactions(): void
         $update_array['lastpost'] = $mybb->get_input('lastpost', MyBB::INPUT_INT);
         $update_array['threadLastEdit'] = $mybb->get_input('threadLastEdit', MyBB::INPUT_INT);
         $update_array['threadLastEditType'] = $mybb->get_input('threadLastEditType');
-        $update_array['hasPrefixID'] = $mybb->get_input('hasPrefixID', MyBB::INPUT_INT);
+        $update_array['hasPrefixID'] = array_map('intval', $mybb->get_input('hasPrefixID', MyBB::INPUT_ARRAY));
         $update_array['forumslist_display'] = $mybb->get_input('forumslist_display', MyBB::INPUT_INT);
         $update_array['threadslist_display'] = $mybb->get_input('threadslist_display', MyBB::INPUT_INT);
 
@@ -338,6 +340,8 @@ function forumcleaner_process_forumactions(): void
         }
 
         if (count($errors) == 0) {
+            $update_array['hasPrefixID'] = implode(',', $update_array['hasPrefixID']);
+
             // update or insert new action
             if ($xid < 0) {
                 // insert
@@ -396,7 +400,7 @@ function forumcleaner_process_forumactions(): void
 
     if ($action == 'add' || $action == 'edit') {
         // Create form.
-        $form = new Form("{$pageUrl}&amp;action={$action}", 'post');
+        $form = new \Form("{$pageUrl}&amp;action={$action}", 'post');
 
         if ($action == 'edit') {
             echo $form->generate_hidden_field('xid', $xid);
@@ -419,7 +423,7 @@ function forumcleaner_process_forumactions(): void
                 'lastpost' => 1,
                 'threadLastEdit' => 0,
                 'threadLastEditType' => 'days',
-                'hasPrefixID' => -1,
+                'hasPrefixID' => [-1],
                 'threadslist_display' => 0,
                 'forumslist_display' => 0,
             ];
@@ -428,7 +432,7 @@ function forumcleaner_process_forumactions(): void
             $mybb->input['forum_type'] = 'all';
         }
 
-        $form_container = new FormContainer(
+        $form_container = new \FormContainer(
             $action == 'edit' ? $lang->forumcleaner_edit_forum_action : $lang->forumcleaner_add_forum_action
         );
 
@@ -553,7 +557,7 @@ checkAction('forum');
             $lang->ForumCleanerActionThreadHasPrefixIDSelect,
             $lang->ForumCleanerActionThreadHasPrefixIDSelectDescription,
             $form->generate_select_box(
-                'hasPrefixID',
+                'hasPrefixID[]',
                 (function () use ($mybb, $lang): array {
                     $prefix_cache = $mybb->cache->read('threadprefixes') ?? [];
 
@@ -566,7 +570,7 @@ checkAction('forum');
                     return $selectObjects;
                 })(),
                 $update_array['hasPrefixID'],
-                ['id' => 'hasPrefixID']
+                ['multiple' => true, 'size' => 5, 'id' => 'hasPrefixID']
             ),
             'hasPrefixID'
         );
@@ -617,7 +621,7 @@ checkAction('forum');
         //config
 
         // Init table.
-        $table = new Table();
+        $table = new \Table();
         $table->construct_header($lang->forumcleaner_forum);
         $table->construct_header($lang->forumcleaner_action, ['class' => 'align_center']);
         $table->construct_header($lang->forumcleaner_age, ['class' => 'align_center']);
@@ -640,7 +644,19 @@ checkAction('forum');
                 $rows[] = $row;
             }
             // sort actions by forum and treads age
-            usort($rows, 'actions_cmp');
+            usort($rows, function (array $a, array $b): int {
+                $cmp = strcmp($a['sort_key'], $b['sort_key']);
+                if ($cmp != 0) {
+                    return $cmp;
+                }
+                if ($a['agesecs'] < $b['agesecs']) {
+                    return -1;
+                }
+                if ($a['agesecs'] > $b['agesecs']) {
+                    return 1;
+                }
+                return 0;
+            });
 
             foreach ($rows as $row) {
                 if ($row['enabled']) {
@@ -668,18 +684,49 @@ checkAction('forum');
                 );
                 $table->construct_cell($forumactions[$row['action']], ['class' => 'align_center']);
 
+                $prefixesCache = $mybb->cache->read('threadprefixes') ?? [];
+
                 $lang_str = "forumcleaner_agetype_{$row['agetype']}";
                 $table->construct_cell(
                     $lang->sprintf(
                         $lang->forumcleaner_thread_age_text,
                         $row['age'],
-                        $lang->$lang_str,
-                        $row['lastpost'] ? $lang->forumcleaner_thread_last_post : $lang->forumcleaner_thread_first_post
+                        $lang->{$lang_str},
+                        $row['lastpost'] ? $lang->forumcleaner_thread_last_post : $lang->forumcleaner_thread_first_post,
+                        $row['threadLastEdit'] ? $lang->sprintf(
+                            $lang->forumcleaner_thread_edit_time,
+                            $row['threadLastEdit'],
+                            $lang->{"forumcleaner_agetype_{$row['threadLastEditType']}"}
+                        ) : '',
+                        $row['hasPrefixID'] ? (function (array $prefixIDs) use ($lang, $prefixesCache): string {
+                            $prefixList = [];
+
+                            if (in_array(-1, $prefixIDs)) {
+                                $prefixList[] = $lang->all_prefix;
+                            } else {
+                                if (in_array(0, $prefixIDs)) {
+                                    $prefixList[] = $lang->none;
+                                }
+
+                                foreach ($prefixesCache as $prefixData) {
+                                    if (in_array($prefixData['pid'], $prefixIDs)) {
+                                        $prefixList[] = $prefixData['prefix'];
+                                    }
+                                }
+                            }
+
+                            return $lang->sprintf(
+                                $lang->forumcleaner_thread_all_prefixes,
+                                implode(', ', $prefixList)
+                            );
+                        })(
+                            explode(',', $row['hasPrefixID'])
+                        ) : ''
                     ),
                     ['class' => 'align_center']
                 );
 
-                $popup = new PopupMenu("action_{$row['xid']}", $lang->forumcleaner_options);
+                $popup = new \PopupMenu("action_{$row['xid']}", $lang->forumcleaner_options);
                 $popup->add_item($lang->forumcleaner_edit, "{$pageUrl}&amp;action=edit&amp;xid={$row['xid']}");
                 if ($row['enabled']) {
                     $popup->add_item(
@@ -842,8 +889,19 @@ function forumcleaner_validate_action(array &$action): array
 
     $prefixesIDs = array_column($mybb->cache->read('threadprefixes'), 'pid');
 
-    if ($action['hasPrefixID'] && $action['hasPrefixID'] !== -1 && !in_array($action['hasPrefixID'], $prefixesIDs)) {
-        $errors['invalid_prefix'] = $lang->ForumCleanerActionInvalidPrefix;
+    if ($action['hasPrefixID']) {
+        if (in_array(-1, $action['hasPrefixID'])) {
+            $action['hasPrefixID'] = [-1];
+        } else {
+            foreach ($action['hasPrefixID'] as $prefixID) {
+                if ($prefixID !== 0 && !in_array($prefixID, $prefixesIDs)) {
+                    _dump($prefixID, $prefixesIDs);
+                    $errors['invalid_thread_last_edit_type'] = $lang->ForumCleanerActionInvalidPrefix;
+
+                    break;
+                }
+            }
+        }
     }
 
     if (!in_array($action['threadLastEditType'], ['hours', 'days', 'weeks', 'months'])) {
@@ -861,22 +919,6 @@ function forumcleaner_validate_action(array &$action): array
     }
 
     return $errors;
-}
-
-// to sort action list
-function actions_cmp(array $a, array $b): int
-{
-    $cmp = strcmp($a['sort_key'], $b['sort_key']);
-    if ($cmp != 0) {
-        return $cmp;
-    }
-    if ($a['agesecs'] < $b['agesecs']) {
-        return -1;
-    }
-    if ($a['agesecs'] > $b['agesecs']) {
-        return 1;
-    }
-    return 0;
 }
 
 function find_orphaned_avatars(): array

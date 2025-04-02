@@ -179,7 +179,7 @@ function executeTask(array &$taskData = []): void
     if (count($users)) {
         // Set up user handler.
         require_once MYBB_ROOT . 'inc/datahandlers/user.php';
-        $userhandler = new UserDataHandler('delete');
+        $userhandler = new \UserDataHandler('delete');
 
         // Delete the pruned users
         $userhandler->delete_user(
@@ -200,7 +200,7 @@ function executeTask(array &$taskData = []): void
     //      $moderation->close_threads($tids)
     if (!is_object($moderation)) {
         require_once MYBB_ROOT . 'inc/class_moderation.php';
-        $moderation = new Moderation();
+        $moderation = new \Moderation();
     }
 
     $existingForumIDs = array_column(cache_forums(), 'fid');
@@ -225,10 +225,10 @@ function executeTask(array &$taskData = []): void
             $whereClauses[] = "t.fid IN ('{$forums}')";
         }
 
-        $hasPrefixID = (int)$action['hasPrefixID'];
+        if ((int)$action['hasPrefixID'] !== -1) {
+            $hasPrefixID = implode("','", array_map('intval', explode(',', $action['hasPrefixID'])));
 
-        if ($hasPrefixID !== -1) {
-            $whereClauses[] = "t.prefix='{$hasPrefixID}'";
+            $whereClauses[] = "t.prefix IN ('{$hasPrefixID}')";
         }
 
         $threadLastEdit = get_seconds((int)$action['threadLastEdit'], $action['threadLastEditType']);

@@ -33,7 +33,6 @@ use function ForumCleaner\Admin\pluginDeactivate;
 use function ForumCleaner\Admin\pluginInfo;
 use function ForumCleaner\Admin\pluginIsInstalled;
 use function ForumCleaner\Admin\pluginUninstall;
-
 use function ForumCleaner\Core\getTemplate;
 
 use const ForumCleaner\ROOT;
@@ -75,7 +74,7 @@ global $plugins;
 
 // Hooks.
 $plugins->add_hook('build_forumbits_forum', 'forumcleaner_build_forumbits');
-$plugins->add_hook('forumdisplay_threadlist', 'forumcleaner_build_threadlist');
+$plugins->add_hook('forumdisplay_end', 'forumcleaner_build_threadlist');
 
 // Action to take to install the plugin.
 function forumcleaner_install(): void
@@ -194,8 +193,6 @@ function get_forumaction_desc(int $fid, string $where): string
         $actions = [];
         $actions = $forumaction_cache[$where][$fid];
 
-        $prefix_cache = $mybb->cache->read('threadprefixes') ?? [];
-
         $ret = '';
         $comma = '';
         foreach ($actions as $fa) {
@@ -231,12 +228,26 @@ function get_forumaction_desc(int $fid, string $where): string
                 );
             }
 
-            $hasPrefixID = (int)$fa['hasPrefixID'];
+            if ((int)$fa['hasPrefixID'] !== -1) {
+                $prefixesCache = $mybb->cache->read('threadprefixes') ?? [];
 
-            if ($hasPrefixID !== -1 && !empty($prefix_cache[$hasPrefixID])) {
+                $hasPrefixIDs = array_map('intval', explode(',', $fa['hasPrefixID']));
+
+                $prefixList = [];
+
+                if (in_array(0, $hasPrefixIDs)) {
+                    $prefixList[] = $lang->forumcleaner_topics_prefix_none;
+                }
+
+                foreach ($hasPrefixIDs as $prefixID) {
+                    if ($prefixID !== 0) {
+                        $prefixList[] = $prefixesCache[$prefixID]['displaystyle'];
+                    }
+                }
+
                 $ret .= $lang->sprintf(
                     $lang->forumcleaner_topics_prefix,
-                    htmlspecialchars_uni(strip_tags($prefix_cache[$hasPrefixID]['prefix']))
+                    implode($lang->comma, $prefixList)
                 );
             }
 

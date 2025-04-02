@@ -160,7 +160,11 @@ $l['forumcleaner_disabled_title'] = 'Disabled. Click to enable.';
 $l['forumcleaner_enable'] = 'Enable';
 $l['forumcleaner_disable'] = 'Disable';
 
-$l['forumcleaner_thread_age_text'] = '{1} {2} for the {3}';
+$l['forumcleaner_thread_age_text'] = '{1} {2} for the {3}.{4}{5}';
+
+$l['forumcleaner_thread_edit_time'] = '<br />Creation time or edit time: {1} {2}';
+
+$l['forumcleaner_thread_all_prefixes'] = '<br />Using prefix: {1}';
 
 $l['forumcleaner_forums'] = 'Forums to clean periodically';
 $l['forumcleaner_no_forums'] = 'No forums to display';
