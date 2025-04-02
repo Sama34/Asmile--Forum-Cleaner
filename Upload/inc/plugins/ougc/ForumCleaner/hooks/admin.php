@@ -232,6 +232,8 @@ function forumcleaner_process_forumactions(): void
             if ($db->num_rows($result)) {
                 $db_array = $db->fetch_array($result);
 
+                $db_array['action'] = explode(',', $db_array['action']);
+
                 $db_array['hasPrefixID'] = explode(',', $db_array['hasPrefixID']);
             } else {
                 $action = 'config';
@@ -323,7 +325,7 @@ function forumcleaner_process_forumactions(): void
 
         $update_array['age'] = $mybb->get_input('age', MyBB::INPUT_INT);
         $update_array['agetype'] = $mybb->get_input('agetype');
-        $update_array['action'] = $mybb->input['forumaction'];
+        $update_array['action'] = $mybb->get_input('forumaction', MyBB::INPUT_ARRAY);
         $update_array['lastpost'] = $mybb->get_input('lastpost', MyBB::INPUT_INT);
         $update_array['threadLastEdit'] = $mybb->get_input('threadLastEdit', MyBB::INPUT_INT);
         $update_array['threadLastEditType'] = $mybb->get_input('threadLastEditType');
@@ -331,7 +333,7 @@ function forumcleaner_process_forumactions(): void
         $update_array['forumslist_display'] = $mybb->get_input('forumslist_display', MyBB::INPUT_INT);
         $update_array['threadslist_display'] = $mybb->get_input('threadslist_display', MyBB::INPUT_INT);
 
-        if ($update_array['action'] == 'move') {
+        if (in_array('move', $update_array['action'])) {
             $update_array['tofid'] = $mybb->get_input('tofid', MyBB::INPUT_INT);
         }
 
@@ -340,6 +342,8 @@ function forumcleaner_process_forumactions(): void
         }
 
         if (count($errors) == 0) {
+            $update_array['action'] = implode(',', $update_array['action']);
+
             $update_array['hasPrefixID'] = implode(',', $update_array['hasPrefixID']);
 
             // update or insert new action
@@ -417,7 +421,7 @@ function forumcleaner_process_forumactions(): void
             $update_array = [
                 'fid' => '-1',
                 'tofid' => -1,
-                'forumaction' => 'close',
+                'forumaction' => ['close'],
                 'age' => 1,
                 'agetype' => 'days',
                 'lastpost' => 1,
@@ -579,10 +583,10 @@ checkAction('forum');
             $lang->forumcleaner_thread_action,
             $lang->forumcleaner_thread_action_desc,
             $form->generate_select_box(
-                'forumaction',
+                'forumaction[]',
                 $forumactions,
                 $update_array['forumaction'],
-                ['id' => 'forumaction']
+                ['multiple' => true, 'id' => 'forumaction']
             ),
             'forumaction'
         );
@@ -682,7 +686,21 @@ checkAction('forum');
                     "<a href=\"{$pageUrl}&amp;action=edit&amp;xid={$row['xid']}\">" .
                     $forum_name . '</a></strong></div>'
                 );
-                $table->construct_cell($forumactions[$row['action']], ['class' => 'align_center']);
+                $table->construct_cell(
+                    implode(
+                        ', ',
+                        (function () use ($row, $forumactions): array {
+                            $actionsList = [];
+
+                            foreach (explode(',', $row['action']) as $action) {
+                                $actionsList[] = $forumactions[$action];
+                            }
+
+                            return $actionsList;
+                        })()
+                    ),
+                    ['class' => 'align_center']
+                );
 
                 $prefixesCache = $mybb->cache->read('threadprefixes') ?? [];
 
@@ -854,15 +872,17 @@ function forumcleaner_validate_action(array &$action): array
 
     $action['agesecs'] = get_seconds((int)$action['age'], $action['agetype']);
 
-    if (!in_array($action['action'], ['delete', 'close', 'move', 'del_redirects'])) {
-        $errors['invalid_action'] = $lang->forumcleaner_invalid_action;
+    foreach ($action['action'] as $forumaction) {
+        if (!in_array($forumaction, ['delete', 'close', 'move', 'del_redirects'])) {
+            $errors['invalid_action'] = $lang->forumcleaner_invalid_action;
+        }
     }
 
     $forums_verify = explode(',', $action['fid']);
 
     if ($action['fid'] == '-1') {
         // All forums IS allowed for delete,close,del_redirects
-        if ($action['action'] == 'move') {
+        if (in_array('move', $action['action'])) {
             $errors['all_is_not_allowed'] = $lang->forumcleaner_all_not_allowed;
             return $errors;
         }
@@ -876,10 +896,10 @@ function forumcleaner_validate_action(array &$action): array
         }
     }
 
-    if ($action['action'] == 'del_redirects') {
+    if (in_array('del_redirects', $action['action'])) {
         // doesn't apply to del_redirects
-        $action['forumslist_display'] = 0;
-        $action['threadslist_display'] = 0;
+        //$action['forumslist_display'] = 0;
+        //$action['threadslist_display'] = 0;
     }
 
     if ($action['lastpost'] != 1) {
@@ -895,7 +915,6 @@ function forumcleaner_validate_action(array &$action): array
         } else {
             foreach ($action['hasPrefixID'] as $prefixID) {
                 if ($prefixID !== 0 && !in_array($prefixID, $prefixesIDs)) {
-                    _dump($prefixID, $prefixesIDs);
                     $errors['invalid_thread_last_edit_type'] = $lang->ForumCleanerActionInvalidPrefix;
 
                     break;

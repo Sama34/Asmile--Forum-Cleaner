@@ -192,16 +192,14 @@ function executeTask(array &$taskData = []): void
         }
     }
 
-    global $moderation;
-
     // obtain standard functions to perform actions
     //      $moderation->delete_thread($tid);
     //      $moderation->move_thread($tid, $new_fid, 'move');
-    //      $moderation->close_threads($tids)
-    if (!is_object($moderation)) {
-        require_once MYBB_ROOT . 'inc/class_moderation.php';
-        $moderation = new \Moderation();
-    }
+    //      $moderation->close_threads($threadIDs)
+
+    require_once MYBB_ROOT . 'inc/class_moderation.php';
+
+    $moderation = new \Moderation();
 
     $existingForumIDs = array_column(cache_forums(), 'fid');
 
@@ -225,10 +223,14 @@ function executeTask(array &$taskData = []): void
             $whereClauses[] = "t.fid IN ('{$forums}')";
         }
 
-        if ((int)$action['hasPrefixID'] !== -1) {
-            $hasPrefixID = implode("','", array_map('intval', explode(',', $action['hasPrefixID'])));
+        $forumActions = explode(',', $action['action']);
 
-            $whereClauses[] = "t.prefix IN ('{$hasPrefixID}')";
+        // delete permanent redirects
+        if (in_array('del_redirects', $forumActions)) {
+            $db->delete_query(
+                "threads t",
+                implode(' AND ', array_merge($whereClauses, ["t.closed LIKE 'moved|%'", "t.deletetime = '0'"]))
+            );
         }
 
         $threadLastEdit = get_seconds((int)$action['threadLastEdit'], $action['threadLastEditType']);
@@ -239,59 +241,64 @@ function executeTask(array &$taskData = []): void
             $whereClauses[] = "((p.edittime='0' AND t.dateline<'{$threadLastEdit}') OR (p.edittime!='0' AND p.edittime<'{$threadLastEdit}'))";
         }
 
-        // delete permanent redirects
-        if ($action['action'] == 'del_redirects') {
-            $whereClauses[] = "t.closed LIKE 'moved|%'";
+        if ((int)$action['hasPrefixID'] !== -1) {
+            $hasPrefixID = implode("','", array_map('intval', explode(',', $action['hasPrefixID'])));
 
-            $whereClauses[] = "t.deletetime = '0'";
+            $whereClauses[] = "t.prefix IN ('{$hasPrefixID}')";
+        }
 
-            $db->delete_query(
-                "threads t LEFT JOIN {$db->table_prefix}posts p ON (p.pid=t.firstpost)",
-                't.tid',
-                implode(' AND ', $whereClauses)
-            );
-        } else {
-            // find open threads, complicated because 'closed' content is not always '0' for open threads
-            if ($action['action'] == 'close') {
-                $whereClauses[] = "t.closed <> '1'";
-
-                $whereClauses[] = "t.closed NOT LIKE 'moved|%'";
-            }
-
+        // find open threads, complicated because 'closed' content is not always '0' for open threads
+        if (in_array('close', $forumActions)) {
             $query = $db->simple_select(
                 "threads t LEFT JOIN {$db->table_prefix}posts p ON (p.pid=t.firstpost)",
                 't.tid, p.edittime',
-                implode(' AND ', $whereClauses),
+                implode(' AND ', array_merge($whereClauses, ["t.closed!='1'", "t.closed NOT LIKE 'moved|%'"])),
                 ['limit' => $threadlimit]
             );
 
-            // nothing to do. required, because $moderation->close_threads do not check number of values.
-            if (!$db->num_rows($query)) {
-                continue;
+            if ($db->num_rows($query)) {
+                $threadIDs = [];
+
+                while ($threadData = $db->fetch_array($query)) {
+                    $threadIDs = (int)$threadData['tid'];
+                }
+
+                $moderation->close_threads($threadIDs);
+            }
+        }
+
+        $threadIDs = [];
+
+        $query = $db->simple_select(
+            "threads t LEFT JOIN {$db->table_prefix}posts p ON (p.pid=t.firstpost)",
+            't.tid, p.edittime',
+            implode(' AND ', $whereClauses),
+            ['limit' => $threadlimit]
+        );
+
+        if ($db->num_rows($query)) {
+            while ($threadData = $db->fetch_array($query)) {
+                $threadIDs[] = (int)$threadData['tid'];
+            }
+        }
+
+        // nothing to do. required, because $moderation->close_threads do not check number of values.
+        if (!$threadIDs) {
+            continue;
+        }
+
+        if (in_array('delete', $forumActions)) {
+            foreach ($threadIDs as $threadID) {
+                $moderation->delete_thread($threadID);
             }
 
-            if ($action['action'] == 'close') {
-                $tids = [];
+            continue;
+        }
 
-                while ($result = $db->fetch_array($query)) {
-                    $tids[] = $result['tid'];
-                }
-
-                $moderation->close_threads($tids);
-            } elseif ($action['action'] == 'move' || $action['action'] == 'delete') {
-                if ($action['action'] == 'move' && !in_array($action['tofid'], $existingForumIDs)) {
-                    continue;
-                }
-
-                while ($result = $db->fetch_array($query)) {
-                    if ($action['action'] == 'move') {
-                        $moderation->move_thread($result['tid'], $action['tofid'], 'move');
-                    } else {
-                        $moderation->delete_thread($result['tid']);
-                    }
-                }
+        if (in_array('move', $forumActions) && in_array($action['tofid'], $existingForumIDs)) {
+            foreach ($threadIDs as $threadID) {
+                $moderation->move_thread($threadID, $action['tofid'], 'move');
             }
-            // else ignore
         }
     }
 

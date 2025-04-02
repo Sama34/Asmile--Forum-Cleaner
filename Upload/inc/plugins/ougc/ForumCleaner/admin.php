@@ -66,7 +66,7 @@ const TABLES_DATA = [
         ],
         'action' => [
             'type' => 'VARCHAR',
-            'size' => 20,
+            'size' => 35,
             'default' => ''
         ],
         'age' => [

@@ -154,7 +154,8 @@ function get_forumaction_desc(int $fid, string $where): string
         $forumaction_cache = [];
         while ($fa = $db->fetch_array($query)) {
             $forums = $fa['fid'];
-            if ($forums == '-1' || $fa['action'] == 'del_redirects') {
+
+            if ($forums == '-1') {
                 continue;
             }
             $forums = array_map('intval', explode(',', $forums));
@@ -197,14 +198,36 @@ function get_forumaction_desc(int $fid, string $where): string
         $comma = '';
         foreach ($actions as $fa) {
             $ret .= $comma;
-            if ($fa['action'] == 'close' || $fa['action'] == 'delete') {
+
+            $forumActions = explode(',', $fa['action']);
+
+            if (in_array('delete', $forumActions)) {
                 $ret .= $lang->sprintf(
-                    $forumactions[$fa['action']],
+                    $forumactions['delete'],
                     $lastpost[$fa['lastpost']],
                     $fa['age'],
                     $agetypes[$fa['agetype']]
                 );
-            } else {
+            } elseif (in_array('close', $forumActions) && in_array('move', $forumActions)) {
+                $ret .= $lang->sprintf(
+                    $lang->forumcleaner_topics_closed_moved,
+                    $lastpost[$fa['lastpost']],
+                    $fa['age'],
+                    $agetypes[$fa['agetype']]
+                );
+            } elseif (in_array('close', $forumActions)) {
+                if (!is_array($forum_cache)) {
+                    cache_forums();
+                }
+
+                $ret .= $lang->sprintf(
+                    $forumactions['close'],
+                    htmlspecialchars_uni(strip_tags($forum_cache[$fa['tofid']]['name'])),
+                    $lastpost[$fa['lastpost']],
+                    $fa['age'],
+                    $agetypes[$fa['agetype']]
+                );
+            } elseif (in_array('move', $forumActions)) {
                 if (!is_array($forum_cache)) {
                     cache_forums();
                 }
@@ -216,6 +239,8 @@ function get_forumaction_desc(int $fid, string $where): string
                     $fa['age'],
                     $agetypes[$fa['agetype']]
                 );
+            } else {
+                continue;
             }
 
             $threadLastEdit = (int)$fa['threadLastEdit'];
