@@ -103,6 +103,16 @@ const TABLES_DATA = [
             'type' => 'TEXT',
             'null' => true
         ],
+        'hasReplies' => [
+            'type' => 'INT',
+            'unsigned' => true,
+            'default' => 0
+        ],
+        'hasRepliesType' => [
+            'type' => 'VARCHAR',
+            'size' => 3,
+            'default' => '>'
+        ],
         'softDeleteThreads' => [
             'type' => 'TINYINT',
             'unsigned' => true,

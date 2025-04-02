@@ -29,7 +29,11 @@ declare(strict_types=1);
 
 namespace ForumCleaner\Hooks\Admin;
 
+use Form;
+use FormContainer;
 use MyBB;
+use PopupMenu;
+use Table;
 
 use function ForumCleaner\Core\executeTask;
 use function ForumCleaner\Core\loadLanguage;
@@ -37,6 +41,12 @@ use function ForumCleaner\Core\loadLanguage;
 use const ForumCleaner\DEBUG;
 use const ForumCleaner\SYSTEM_NAME;
 use const ForumCleaner\SYSTEM_NAME_AVATARS;
+use const ForumCleaner\Core\COMPARISON_TYPE_EQUAL;
+use const ForumCleaner\Core\COMPARISON_TYPE_GREATER_THAN;
+use const ForumCleaner\Core\COMPARISON_TYPE_GREATER_THAN_OR_EQUAL;
+use const ForumCleaner\Core\COMPARISON_TYPE_LESS_THAN;
+use const ForumCleaner\Core\COMPARISON_TYPE_LESS_THAN_OR_EQUAL;
+use const ForumCleaner\Core\COMPARISON_TYPE_NOT_EQUAL;
 use const ForumCleaner\Admin\URL;
 use const ForumCleaner\Admin\URL_AVATARS;
 
@@ -181,6 +191,15 @@ function forumcleaner_process_forumactions(): void
     $page->add_breadcrumb_item($lang->forumcleaner);
     $page->output_header($lang->forumcleaner);
 
+    $comparisonTypes = [
+        COMPARISON_TYPE_GREATER_THAN => $lang->ForumCleanerComparisonTypeGreaterThan,
+        COMPARISON_TYPE_GREATER_THAN_OR_EQUAL => $lang->ForumCleanerComparisonTypeGreaterThanOrEqual,
+        COMPARISON_TYPE_EQUAL => $lang->ForumCleanerComparisonTypeEqual,
+        COMPARISON_TYPE_NOT_EQUAL => $lang->ForumCleanerComparisonTypeNotEqual,
+        COMPARISON_TYPE_LESS_THAN_OR_EQUAL => $lang->ForumCleanerComparisonTypeLessThanOrEqual,
+        COMPARISON_TYPE_LESS_THAN => $lang->ForumCleanerComparisonTypeLessThan,
+    ];
+
     $systemName = SYSTEM_NAME;
 
     // Warnings.
@@ -230,7 +249,7 @@ function forumcleaner_process_forumactions(): void
         } else {
             $result = $db->simple_select(
                 $systemName,
-                'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid',
+                'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid, hasReplies, hasRepliesType',
                 "xid = '{$xid}'"
             );
             if ($db->num_rows($result)) {
@@ -343,6 +362,8 @@ function forumcleaner_process_forumactions(): void
         $update_array['threadLastEdit'] = $mybb->get_input('threadLastEdit', MyBB::INPUT_INT);
         $update_array['threadLastEditType'] = $mybb->get_input('threadLastEditType');
         $update_array['hasPrefixID'] = array_map('intval', $mybb->get_input('hasPrefixID', MyBB::INPUT_ARRAY));
+        $update_array['hasReplies'] = $mybb->get_input('hasReplies', MyBB::INPUT_INT);
+        $update_array['hasRepliesType'] = $mybb->get_input('hasRepliesType');
         $update_array['forumslist_display'] = $mybb->get_input('forumslist_display', MyBB::INPUT_INT);
         $update_array['threadslist_display'] = $mybb->get_input('threadslist_display', MyBB::INPUT_INT);
 
@@ -417,7 +438,7 @@ function forumcleaner_process_forumactions(): void
 
     if ($action == 'add' || $action == 'edit') {
         // Create form.
-        $form = new \Form("{$pageUrl}&amp;action={$action}", 'post');
+        $form = new Form("{$pageUrl}&amp;action={$action}", 'post');
 
         if ($action == 'edit') {
             echo $form->generate_hidden_field('xid', $xid);
@@ -442,6 +463,8 @@ function forumcleaner_process_forumactions(): void
                 'threadLastEdit' => 0,
                 'threadLastEditType' => 'days',
                 'hasPrefixID' => [-1],
+                'hasReplies' => 0,
+                'hasRepliesType' => '>',
                 'threadslist_display' => 0,
                 'forumslist_display' => 0,
             ];
@@ -450,7 +473,7 @@ function forumcleaner_process_forumactions(): void
             $mybb->input['forum_type'] = 'all';
         }
 
-        $form_container = new \FormContainer(
+        $form_container = new FormContainer(
             $action == 'edit' ? $lang->forumcleaner_edit_forum_action : $lang->forumcleaner_add_forum_action
         );
 
@@ -594,6 +617,23 @@ checkAction('forum');
         );
 
         $form_container->output_row(
+            $lang->ForumCleanerActionThreadHasReplies,
+            $lang->ForumCleanerActionThreadHasRepliesDescription,
+            $form->generate_numeric_field(
+                'hasReplies',
+                $update_array['hasReplies'],
+                ['id' => 'hasReplies']
+            ) . ' ' .
+            $form->generate_select_box(
+                'hasRepliesType',
+                $comparisonTypes,
+                $update_array['hasRepliesType'],
+                ['id' => 'hasRepliesType']
+            ),
+            'hasReplies'
+        );
+
+        $form_container->output_row(
             $lang->forumcleaner_thread_action,
             $lang->forumcleaner_thread_action_desc,
             $form->generate_select_box(
@@ -646,7 +686,7 @@ checkAction('forum');
         //config
 
         // Init table.
-        $table = new \Table();
+        $table = new Table();
         $table->construct_header($lang->forumcleaner_forum);
         $table->construct_header($lang->forumcleaner_action, ['class' => 'align_center']);
         $table->construct_header($lang->forumcleaner_age, ['class' => 'align_center']);
@@ -761,12 +801,17 @@ checkAction('forum');
                             );
                         })(
                             explode(',', $row['hasPrefixID'])
+                        ) : '',
+                        $row['hasReplies'] ? $lang->sprintf(
+                            $lang->forumcleaner_thread_has_replies,
+                            $comparisonTypes[$row['hasRepliesType']],
+                            $row['hasReplies']
                         ) : ''
                     ),
                     ['class' => 'align_center']
                 );
 
-                $popup = new \PopupMenu("action_{$row['xid']}", $lang->forumcleaner_options);
+                $popup = new PopupMenu("action_{$row['xid']}", $lang->forumcleaner_options);
                 $popup->add_item($lang->forumcleaner_edit, "{$pageUrl}&amp;action=edit&amp;xid={$row['xid']}");
                 if ($row['enabled']) {
                     $popup->add_item(
@@ -943,6 +988,17 @@ function forumcleaner_validate_action(array &$action): array
                 }
             }
         }
+    }
+
+    if (!in_array($action['hasRepliesType'], [
+        COMPARISON_TYPE_GREATER_THAN,
+        COMPARISON_TYPE_GREATER_THAN_OR_EQUAL,
+        COMPARISON_TYPE_EQUAL,
+        COMPARISON_TYPE_NOT_EQUAL,
+        COMPARISON_TYPE_LESS_THAN_OR_EQUAL,
+        COMPARISON_TYPE_LESS_THAN,
+    ])) {
+        $errors['invalid_thread_last_edit_type'] = $lang->ForumCleanerActionInvalidRepliesType;
     }
 
     if (!in_array($action['threadLastEditType'], ['hours', 'days', 'weeks', 'months'])) {

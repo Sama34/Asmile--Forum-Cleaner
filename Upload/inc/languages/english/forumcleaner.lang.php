@@ -25,13 +25,22 @@
  *  MYBB_ROOT/inc/languages/english/admin/forumcleaner.lang.php
  */
 
+$l['ForumCleanerComparisonTypeGreaterThan'] = 'Greater than';
+$l['ForumCleanerComparisonTypeGreaterThanOrEqual'] = 'Greater than or equal';
+$l['ForumCleanerComparisonTypeEqual'] = 'Equal';
+$l['ForumCleanerComparisonTypeNotEqual'] = 'Not equal';
+$l['ForumCleanerComparisonTypeLessThanOrEqual'] = 'Less than or equal';
+$l['ForumCleanerComparisonTypeLessThan'] = 'Less than';
+
 $l['forumcleaner_topics_deleted'] = 'Threads are deleted when the {1} is {2} {3} old.';
 $l['forumcleaner_topics_closed'] = 'Threads are closed when the {1} is {2} {3} old.';
 $l['forumcleaner_topics_moved'] = 'Threads are moved to "{1}" when the {2} is {3} {4} old.';
 $l['forumcleaner_topics_closed_moved'] = 'Threads are closed and moved when the {1} is {2} {3} old.';
-$l['forumcleaner_topics_last_edit'] = ' Applies to threads created or last edited {1} {2} ago.';
-$l['forumcleaner_topics_prefix'] = ' <span>Applies to threads with prefix: {1}</span>';
+$l['forumcleaner_topics_conditions'] = ' Applies to threads {1}.';
+$l['forumcleaner_topics_last_edit'] = 'created or last edited {1} {2} ago';
+$l['forumcleaner_topics_prefix'] = 'with prefix {1}';
 $l['forumcleaner_topics_prefix_none'] = '(no prefix)';
+$l['forumcleaner_topics_replies'] = 'with "{1}" {2} replies';
 
 $l['forumcleaner_topics_firstpost'] = 'first post';
 $l['forumcleaner_topics_lastpost'] = 'last post';

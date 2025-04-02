@@ -35,6 +35,12 @@ use function ForumCleaner\Admin\pluginIsInstalled;
 use function ForumCleaner\Admin\pluginUninstall;
 use function ForumCleaner\Core\getTemplate;
 
+use const ForumCleaner\Core\COMPARISON_TYPE_EQUAL;
+use const ForumCleaner\Core\COMPARISON_TYPE_GREATER_THAN;
+use const ForumCleaner\Core\COMPARISON_TYPE_GREATER_THAN_OR_EQUAL;
+use const ForumCleaner\Core\COMPARISON_TYPE_LESS_THAN;
+use const ForumCleaner\Core\COMPARISON_TYPE_LESS_THAN_OR_EQUAL;
+use const ForumCleaner\Core\COMPARISON_TYPE_NOT_EQUAL;
 use const ForumCleaner\ROOT;
 use const ForumCleaner\SYSTEM_NAME;
 
@@ -147,7 +153,7 @@ function get_forumaction_desc(int $fid, string $where): string
     if (!is_array($forumaction_cache)) {
         $query = $db->simple_select(
             SYSTEM_NAME,
-            'fid, threadslist_display, forumslist_display, action, age, agetype, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid',
+            'fid, threadslist_display, forumslist_display, action, age, agetype, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, hasReplies, hasRepliesType, softDeleteThreads, tofid',
             'enabled = 1 AND (forumslist_display = 1 OR threadslist_display = 1)'
         );
 
@@ -192,6 +198,15 @@ function get_forumaction_desc(int $fid, string $where): string
         count($forumaction_cache[$where]) &&
         array_key_exists($fid, $forumaction_cache[$where])) {
         $actions = $forumaction_cache[$where][$fid];
+
+        $comparisonTypes = [
+            COMPARISON_TYPE_GREATER_THAN => $lang->ForumCleanerComparisonTypeGreaterThan,
+            COMPARISON_TYPE_GREATER_THAN_OR_EQUAL => $lang->ForumCleanerComparisonTypeGreaterThanOrEqual,
+            COMPARISON_TYPE_EQUAL => $lang->ForumCleanerComparisonTypeEqual,
+            COMPARISON_TYPE_NOT_EQUAL => $lang->ForumCleanerComparisonTypeNotEqual,
+            COMPARISON_TYPE_LESS_THAN_OR_EQUAL => $lang->ForumCleanerComparisonTypeLessThanOrEqual,
+            COMPARISON_TYPE_LESS_THAN => $lang->ForumCleanerComparisonTypeLessThan,
+        ];
 
         $ret = '';
         $comma = '';
@@ -242,10 +257,12 @@ function get_forumaction_desc(int $fid, string $where): string
                 continue;
             }
 
+            $ruleConditions = [];
+
             $threadLastEdit = (int)$fa['threadLastEdit'];
 
             if ($threadLastEdit) {
-                $ret .= $lang->sprintf(
+                $ruleConditions[] = $lang->sprintf(
                     $lang->forumcleaner_topics_last_edit,
                     $threadLastEdit,
                     $agetypes[$fa['threadLastEditType']]
@@ -269,9 +286,26 @@ function get_forumaction_desc(int $fid, string $where): string
                     }
                 }
 
-                $ret .= $lang->sprintf(
+                $ruleConditions[] = $lang->sprintf(
                     $lang->forumcleaner_topics_prefix,
                     implode($lang->comma, $prefixList)
+                );
+            }
+
+            if ($fa['hasReplies']) {
+                $ruleConditions[] = $lang->sprintf(
+                    $lang->forumcleaner_topics_replies,
+                    $comparisonTypes[$fa['hasRepliesType']],
+                    $fa['hasReplies']
+                );
+            }
+
+            if ($ruleConditions) {
+                $ruleConditions = implode(' ' . $lang->and . ' ', $ruleConditions);
+
+                $ret .= $lang->sprintf(
+                    $lang->forumcleaner_topics_conditions,
+                    $ruleConditions
                 );
             }
 

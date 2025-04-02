@@ -29,10 +29,25 @@ declare(strict_types=1);
 
 namespace ForumCleaner\Core;
 
+use Moderation;
+use UserDataHandler;
+
 use const ForumCleaner\DEBUG;
 use const ForumCleaner\ROOT;
 use const ForumCleaner\SETTINGS;
 use const ForumCleaner\SYSTEM_NAME;
+
+const COMPARISON_TYPE_GREATER_THAN = '>';
+
+const COMPARISON_TYPE_GREATER_THAN_OR_EQUAL = '>=';
+
+const COMPARISON_TYPE_EQUAL = '=';
+
+const COMPARISON_TYPE_NOT_EQUAL = '!=';
+
+const COMPARISON_TYPE_LESS_THAN_OR_EQUAL = '<=';
+
+const COMPARISON_TYPE_LESS_THAN = '<';
 
 function addHooks(string $namespace): void
 {
@@ -179,7 +194,7 @@ function executeTask(array &$taskData = []): void
     if (count($users)) {
         // Set up user handler.
         require_once MYBB_ROOT . 'inc/datahandlers/user.php';
-        $userhandler = new \UserDataHandler('delete');
+        $userhandler = new UserDataHandler('delete');
 
         // Delete the pruned users
         $userhandler->delete_user(
@@ -199,14 +214,14 @@ function executeTask(array &$taskData = []): void
 
     require_once MYBB_ROOT . 'inc/class_moderation.php';
 
-    $moderation = new \Moderation();
+    $moderation = new Moderation();
 
     $existingForumIDs = array_column(cache_forums(), 'fid');
 
     // Get action list
     $forumactions = $db->simple_select(
         SYSTEM_NAME,
-        'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid',
+        'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid, hasReplies, hasRepliesType',
         "enabled = '1'"
     );
 
@@ -232,9 +247,15 @@ function executeTask(array &$taskData = []): void
         // delete permanent redirects
         if (in_array('del_redirects', $forumActions)) {
             $db->delete_query(
-                "threads t",
+                'threads t',
                 implode(' AND ', array_merge($whereClauses, ["t.closed LIKE 'moved|%'", "t.deletetime = '0'"]))
             );
+        }
+
+        $hasReplies = (int)$action['hasReplies'];
+
+        if ($hasReplies) {
+            $whereClauses[] = "t.replies{$action['hasRepliesType']}'{$hasReplies}'";
         }
 
         $threadLastEdit = get_seconds((int)$action['threadLastEdit'], $action['threadLastEditType']);

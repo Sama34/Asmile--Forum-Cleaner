@@ -32,6 +32,13 @@
 $l['forumcleaner'] = 'Forum Cleaner';
 $l['forumcleaner_desc'] = 'A MyBB plugin to help Administrators keep things clean.';
 
+$l['ForumCleanerComparisonTypeGreaterThan'] = 'Greater than';
+$l['ForumCleanerComparisonTypeGreaterThanOrEqual'] = 'Greater than or equal';
+$l['ForumCleanerComparisonTypeEqual'] = 'Equal';
+$l['ForumCleanerComparisonTypeNotEqual'] = 'Not equal';
+$l['ForumCleanerComparisonTypeLessThanOrEqual'] = 'Less than or equal';
+$l['ForumCleanerComparisonTypeLessThan'] = 'Less than';
+
 // Settings
 $l['setting_group_forumcleaner'] = 'Forum Cleaner options';
 $l['setting_group_forumcleaner_desc'] = 'Plugin allows automatically clean forums from old threads ' .
@@ -91,6 +98,7 @@ $l['forumcleaner_action_deleted'] = 'Action succesfuly deleted';
 $l['forumcleaner_invalid_age'] = 'The age should be at least 1';
 $l['forumcleaner_invalid_agetype'] = 'The age type is invalid';
 $l['ForumCleanerActionInvalidPrefix'] = 'The prefix is invalid';
+$l['ForumCleanerActionInvalidRepliesType'] = 'The replies comparison type is invalid.';
 $l['ForumCleanerActionInvalidThreadLastEditType'] = 'The thread last edit type is invalid';
 $l['forumcleaner_invalid_forum_id'] = 'Provided forum id is invalid';
 $l['forumcleaner_invalid_action'] = 'Provided action is invalid';
@@ -121,6 +129,8 @@ $l['ForumCleanerActionThreadLastEditDescription'] = 'Thread should have been edi
 
 $l['ForumCleanerActionThreadHasPrefixIDSelect'] = 'Thread Has Prefix';
 $l['ForumCleanerActionThreadHasPrefixIDSelectDescription'] = 'Thread should have prefix to be selected for action.';
+$l['ForumCleanerActionThreadHasReplies'] = 'Thread Replies';
+$l['ForumCleanerActionThreadHasRepliesDescription'] = 'Thread should have replies to be selected for action. Set to <code>0</code> to ignore this condition.';
 
 $l['forumcleaner_thread_first_post'] = 'First post in thread';
 $l['forumcleaner_thread_last_post'] = 'Last post in thread';
@@ -163,13 +173,15 @@ $l['forumcleaner_disabled_title'] = 'Disabled. Click to enable.';
 $l['forumcleaner_enable'] = 'Enable';
 $l['forumcleaner_disable'] = 'Disable';
 
-$l['forumcleaner_thread_age_text'] = '{1} {2} for the {3}.{4}{5}';
+$l['forumcleaner_thread_age_text'] = '{1} {2} for the {3}.{4}{5}{6}';
 
 $l['forumcleaner_thread_edit_time'] = '<br />Creation time or edit time: {1} {2}';
 
 $l['forumcleaner_thread_using_prefix'] = '<br />Using prefix: {1}';
 $l['forumcleaner_thread_using_prefix_any_none'] = 'Any or none';
 $l['forumcleaner_thread_using_prefix_none'] = '(no prefix)';
+
+$l['forumcleaner_thread_has_replies'] = '<br />Threads have "{1}" {2} replies.';
 
 $l['forumcleaner_forums'] = 'Forums to clean periodically';
 $l['forumcleaner_no_forums'] = 'No forums to display';
