@@ -1,34 +1,29 @@
 <?php
 
-/*
-	Forum Cleaner - A MyBB plugin to help Administrators keep things clean.
-
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-/*
- * This file is MYBB_ROOT/inc/plugins/forumcleaner.php
- * There should also be a files
- *  MYBB_ROOT/inc/tasks/forumcleaner.php
- *  MYBB_ROOT/inc/languages/english/admin/forumcleaner.lang.php
- *  MYBB_ROOT/inc/languages/english/forumcleaner.lang.php
- */
-
-/*
- * This plugin based on heavily rewritten AutoExpunge plugin (Created by The forum.kde.org team)
- * and lots of Copy&Paste's from Admin CP tools
- */
+/***************************************************************************
+ *
+ *    Forum Cleaner plugin (/inc/plugins/ougc/ForumCleaner/admin.php)
+ *    Author: Andriy Smilyanets
+ *    Maintainer: Omar Gonzalez
+ *
+ *    A MyBB plugin to help Administrators keep things clean.
+ *    This plugin based on heavily rewritten AutoExpunge plugin (Created by The forum.kde.org team) and lots of Copy&Paste's from Admin CP tools
+ *
+ ***************************************************************************
+ ****************************************************************************
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ ****************************************************************************/
 
 declare(strict_types=1);
 
@@ -38,9 +33,9 @@ use DirectoryIterator;
 use PluginLibrary;
 use stdClass;
 
+use const MYBB_ROOT;
 use const ForumCleaner\ROOT;
 use const ForumCleaner\SYSTEM_NAME;
-use const MYBB_ROOT;
 
 const TABLES_DATA = [
     SYSTEM_NAME => [
@@ -121,6 +116,10 @@ const TASK_DEACTIVATE = 0;
 
 const TASK_DELETE = -1;
 
+const URL = 'index.php?module=forum-forumcleaner';
+
+const URL_AVATARS = 'index.php?module=user-orphanavatars';
+
 function pluginInfo(): array
 {
     global $lang;
@@ -153,8 +152,8 @@ function pluginInfo(): array
         'codename' => 'ougc_forumcleaner',
         'sysname' => SYSTEM_NAME,
         'avasysname' => 'orphanavatars',
-        'cfglink' => 'index.php?module=forum-forumcleaner',
-        'avalink' => 'index.php?module=user-orphanavatars',
+        'cfglink' => URL,
+        'avalink' => URL_AVATARS,
         'files' => [
             'inc/plugins/forumcleaner.php',
             'inc/tasks/forumcleaner.php',
