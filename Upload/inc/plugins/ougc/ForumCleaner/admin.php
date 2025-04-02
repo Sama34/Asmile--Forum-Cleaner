@@ -94,6 +94,20 @@ const TABLES_DATA = [
             'unsigned' => true,
             'default' => 1
         ],
+        'threadLastEdit' => [
+            'type' => 'INT',
+            'unsigned' => true,
+            'default' => 0
+        ],
+        'threadLastEditType' => [
+            'type' => 'VARCHAR',
+            'size' => 8,
+            'default' => ''
+        ],
+        'hasPrefixID' => [
+            'type' => 'INT',
+            'default' => -1
+        ],
         'tofid' => [
             'type' => 'INT',
             'default' => -1

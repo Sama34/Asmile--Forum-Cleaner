@@ -39,7 +39,9 @@ use function ForumCleaner\Admin\pluginInfo;
 use function ForumCleaner\Admin\pluginIsInstalled;
 use function ForumCleaner\Admin\pluginUninstall;
 
+use const ForumCleaner\DEBUG;
 use const ForumCleaner\ROOT;
+use const ForumCleaner\SYSTEM_NAME;
 
 if (!defined('IN_MYBB')) {
     die('Nope.');
@@ -48,6 +50,8 @@ if (!defined('IN_MYBB')) {
 define('ForumCleaner\SYSTEM_NAME', 'forumcleaner');
 
 define('ForumCleaner\ROOT', MYBB_ROOT . 'inc/plugins/ougc/ForumCleaner');
+
+define('ForumCleaner\DEBUG', true);
 
 defined('PLUGINLIBRARY') || define('PLUGINLIBRARY', MYBB_ROOT . 'inc/plugins/pluginlibrary.php');
 
@@ -177,7 +181,6 @@ function forumcleaner_validate_action(array &$action): array
         $errors['invalid_agetype'] = $lang->forumcleaner_invalid_agetype;
     }
 
-    _dump($action);
     $action['agesecs'] = get_seconds((int)$action['age'], $action['agetype']);
 
     if (!in_array($action['action'], ['delete', 'close', 'move', 'del_redirects'])) {
@@ -213,6 +216,16 @@ function forumcleaner_validate_action(array &$action): array
         $action['lastpost'] = 0;
     }
 
+    $prefixesIDs = array_column($mybb->cache->read('threadprefixes'), 'pid');
+
+    if ($action['hasPrefixID'] && $action['hasPrefixID'] !== -1 && !in_array($action['hasPrefixID'], $prefixesIDs)) {
+        $errors['invalid_prefix'] = $lang->ForumCleanerActionInvalidPrefix;
+    }
+
+    if (!in_array($action['threadLastEditType'], ['hours', 'days', 'weeks', 'months'])) {
+        $errors['invalid_thread_last_edit_type'] = $lang->ForumCleanerActionInvalidThreadLastEditType;
+    }
+
     if ($action['action'] == 'move') {
         if (!array_key_exists($action['tofid'], $forum_cache)) {
             $errors['invalid_target_forum_id'] = $lang->forumcleaner_invalid_target_forum_id;
@@ -232,7 +245,7 @@ function get_sort_key(int $fid): string
     if ($fid) {
         global $forum_cache;
 
-        return get_sort_key($forum_cache[$fid]['pid']) . sprintf('%04d', $forum_cache[$fid]['disporder']);
+        return get_sort_key((int)$forum_cache[$fid]['pid']) . sprintf('%04d', $forum_cache[$fid]['disporder']);
     } else {
         return '';
     }
@@ -257,6 +270,10 @@ function actions_cmp(array $a, array $b): int
 // Configuration page.
 function forumcleaner_admin_load(): void
 {
+    if (DEBUG) {
+        forumcleaner_task();
+    }
+
     global $page;
 
     $me = forumcleaner_info();
@@ -372,7 +389,7 @@ function forumcleaner_process_forumactions(): void
                 $update = 1;
             }
 
-            $result = $db->simple_select($me['sysname'], '*', "xid = '$xid' and enabled = {$find}");
+            $result = $db->simple_select($me['sysname'], '*', "xid = '$xid' AND enabled = {$find}");
             if ($expunge = $db->fetch_array($result)) {
                 log_admin_action(['xid' => $xid, 'fid' => $expunge['fid']]);
                 $db->update_query($me['sysname'], ['enabled' => $update], "xid = '{$xid}'");
@@ -428,6 +445,9 @@ function forumcleaner_process_forumactions(): void
         $update_array['agetype'] = $mybb->get_input('agetype');
         $update_array['action'] = $mybb->input['forumaction'];
         $update_array['lastpost'] = $mybb->get_input('lastpost', MyBB::INPUT_INT);
+        $update_array['threadLastEdit'] = $mybb->get_input('threadLastEdit', MyBB::INPUT_INT);
+        $update_array['threadLastEditType'] = $mybb->get_input('threadLastEditType');
+        $update_array['hasPrefixID'] = $mybb->get_input('hasPrefixID', MyBB::INPUT_INT);
         $update_array['forumslist_display'] = $mybb->get_input('forumslist_display', MyBB::INPUT_INT);
         $update_array['threadslist_display'] = $mybb->get_input('threadslist_display', MyBB::INPUT_INT);
 
@@ -519,6 +539,9 @@ function forumcleaner_process_forumactions(): void
                 'age' => 1,
                 'agetype' => 'days',
                 'lastpost' => 1,
+                'threadLastEdit' => 0,
+                'threadLastEditType' => 'days',
+                'hasPrefixID' => -1,
                 'threadslist_display' => 0,
                 'forumslist_display' => 0,
             ];
@@ -614,7 +637,7 @@ checkAction('forum');
         $form_container->output_row(
             $lang->forumcleaner_thread_age,
             $lang->forumcleaner_thread_age_desc,
-            $form->generate_text_box('age', $update_array['age'], ['id' => 'age']) . ' ' .
+            $form->generate_numeric_field('age', $update_array['age'], ['id' => 'age']) . ' ' .
             $form->generate_select_box('agetype', $agetypes, $update_array['agetype'], ['id' => 'agetype']),
             'age'
         );
@@ -629,6 +652,45 @@ checkAction('forum');
                 ['id' => 'lastpost']
             ),
             'lastpost'
+        );
+
+        $form_container->output_row(
+            $lang->ForumCleanerActionThreadLastEdit,
+            $lang->ForumCleanerActionThreadLastEditDescription,
+            $form->generate_numeric_field(
+                'threadLastEdit',
+                $update_array['threadLastEdit'],
+                ['id' => 'threadLastEdit']
+            ) . ' ' .
+            $form->generate_select_box(
+                'threadLastEditType',
+                $agetypes,
+                $update_array['threadLastEditType'],
+                ['id' => 'threadLastEditType']
+            ),
+            'threadLastEdit'
+        );
+
+        $form_container->output_row(
+            $lang->ForumCleanerActionThreadHasPrefixIDSelect,
+            $lang->ForumCleanerActionThreadHasPrefixIDSelectDescription,
+            $form->generate_select_box(
+                'hasPrefixID',
+                (function () use ($mybb, $lang): array {
+                    $prefix_cache = $mybb->cache->read('threadprefixes') ?? [];
+
+                    $selectObjects = [-1 => $lang->all_prefix, 0 => $lang->none];
+
+                    foreach ($prefix_cache as $prefix) {
+                        $selectObjects[$prefix['pid']] = htmlspecialchars_uni($prefix['prefix']);
+                    }
+
+                    return $selectObjects;
+                })(),
+                $update_array['hasPrefixID'],
+                ['id' => 'hasPrefixID']
+            ),
+            'hasPrefixID'
         );
 
         $form_container->output_row(
@@ -769,7 +831,9 @@ checkAction('forum');
         }
         $table->output($lang->forumcleaner_forums);
     }
+
     echo "<br /><small><strong>{$me['name']} plugin &copy; 2010</strong></small>";
+
     $page->output_footer(true);
 }// function forumcleaner_process_forumactions()
 
@@ -905,7 +969,7 @@ function find_orphaned_avatars(): array
         $user_notfinished = 1;
 
         while ($file_notfinished || $user_notfinished) {
-            if ($file_notfinished and ($file = readdir($dir))) {
+            if ($file_notfinished && ($file = readdir($dir))) {
                 if (array_key_exists($file, $user_avatars)) {
                     unset($user_avatars[$file]);
                 } else {
@@ -915,7 +979,7 @@ function find_orphaned_avatars(): array
                 $file_notfinished = 0;
             }
 
-            if ($user_notfinished and ($ufile = $db->fetch_array($query))) {
+            if ($user_notfinished && ($ufile = $db->fetch_array($query))) {
                 $file = preg_replace('#.+/#', '', $ufile['avatar']);
                 $file = preg_replace("#\\?.+#", '', $file);
 
@@ -947,13 +1011,12 @@ function get_forumaction_desc(int $fid, string $where): string
     static $forumaction_cache;
     global $db, $lang, $forum_cache;
 
-    $me = forumcleaner_info();
-
+    $lang->load('forumcleaner');
 
     // keep information cached
     if (!is_array($forumaction_cache)) {
         $query = $db->simple_select(
-            $me['sysname'],
+            SYSTEM_NAME,
             '*',
             'enabled = 1 AND (forumslist_display = 1 OR threadslist_display = 1)'
         );
@@ -995,8 +1058,8 @@ function get_forumaction_desc(int $fid, string $where): string
     ];
 
 
-    if (count($forumaction_cache) and isset($forumaction_cache[$where]) and
-        count($forumaction_cache[$where]) and
+    if (count($forumaction_cache) && isset($forumaction_cache[$where]) &&
+        count($forumaction_cache[$where]) &&
         array_key_exists($fid, $forumaction_cache[$where])) {
         $actions = [];
         $actions = $forumaction_cache[$where][$fid];
@@ -1036,15 +1099,14 @@ function get_forumaction_desc(int $fid, string $where): string
 function forumcleaner_build_forumbits(array &$forum): void
 {
     global $templates;
-    $me = forumcleaner_info();
 
     $messages = get_forumaction_desc((int)$forum['fid'], 'forums');
     if (strlen($messages)) {
         $subst = '';
 
-        eval("\$subst = \"" . $templates->get($me['sysname'] . '_forumbit') . "\";");
+        eval("\$subst = \"" . $templates->get(SYSTEM_NAME . '_forumbit') . "\";");
 
-        $forum[$me['sysname'] . '_forumbit'] = $subst;
+        $forum[SYSTEM_NAME . '_forumbit'] = $subst;
     }
 }
 
@@ -1060,5 +1122,206 @@ function forumcleaner_build_threadlist(): void
         eval("\$subst = \"" . $templates->get($me['sysname'] . '_threadlist') . "\";");
 
         $mybb->input[$me['sysname'] . '_threadlist'] = $subst;
+    }
+}
+
+function forumcleaner_task(array &$task = [])
+{
+    global $db, $mybb, $plugins;
+
+    $sysname = 'forumcleaner';
+    $threadlimit = (int)($mybb->settings[$sysname . '_threadlimit'] ?? 30);
+    $userlimit = (int)($mybb->settings[$sysname . '_userlimit'] ?? 50);
+    $awaitingdays = (int)($mybb->settings[$sysname . '_awaitingdays'] ?? 0);
+    $inactivedays = (int)($mybb->settings[$sysname . '_inactivedays'] ?? 0);
+
+    if ($mybb->settings[$sysname . '_groupids'] == -1) {
+        $exceptions = -1;
+    } else {
+        $exceptions = [4];// except Administrators
+
+        foreach (explode(',', $mybb->settings[$sysname . '_groupids']) as $gid) {
+            $exceptions[] = (int)$gid;
+        }
+
+        $exceptions = implode(',', $exceptions);
+    }
+
+    $users = [];
+
+    // delete awaiting activation users
+    if ($awaitingdays) {
+        $breakdate = TIME_NOW - $awaitingdays * 24 * 60 * 60;
+
+        $query = $db->simple_select(
+            'awaitingactivation a, LEFT JOIN ' . TABLE_PREFIX . 'users u ON (a.uid=u.uid)',
+            'a.uid',
+            "a.type='r' AND a.dateline<'{$breakdate}' AND u.usergroup='5'",
+            ['limit' => $userlimit]
+        );
+
+        while ($uid = $db->fetch_field($query, 'uid')) {
+            $users[] = (int)$uid;
+        }
+    } // delete awaiting activation users
+
+    // delete inactive users
+    if ($inactivedays && count($users) < $userlimit) {
+        $breakdate = TIME_NOW - $inactivedays * 24 * 60 * 60;
+
+        $query = $db->simple_select(
+            'users u',
+            'u.uid, u.usergroup, u.additionalgroups, u.displaygroup',
+            "u.lastvisit<'{$breakdate}' AND u.uid NOT IN (
+				SELECT p.uid
+				FROM " . TABLE_PREFIX . 'posts p
+			)',
+            ['limit' => $userlimit]
+        );
+
+        while ($result = $db->fetch_array($query)) {
+            if ((int)$result['displaygroup']) {
+                $result['additionalgroups'] .= ',' . $result['displaygroup'];
+            }
+
+            // if not in exception list
+            if (!is_member($exceptions, $result)) {
+                $users[] = $result['uid'];
+                if (count($users) == $userlimit) {
+                    break;
+                }
+            }
+        }
+    } // delete inactive users
+
+    if (is_object($plugins)) {
+        $args = [
+            'users' => &$users,
+        ];
+        $plugins->run_hooks('task_forumcleaner_users', $args);
+    }
+
+    // Delete and Update forum stats
+    if (count($users)) {
+        // Set up user handler.
+        require_once MYBB_ROOT . 'inc/datahandlers/user.php';
+        $userhandler = new UserDataHandler('delete');
+
+        // Delete the pruned users
+        $userhandler->delete_user(
+            $users,
+            0
+        ); // Default prune system uses $mybb->settings['prunethreads'] here but we are going to omit it for now since 0 is the plugin default value here
+
+        if (function_exists('add_task_log')) {
+            add_task_log($task, count($users) . ' users deleted');
+        }
+    }
+
+    global $moderation;
+
+    // obtain standard functions to perform actions
+    //      $moderation->delete_thread($tid);
+    //      $moderation->move_thread($tid, $new_fid, 'move');
+    //      $moderation->close_threads($tids)
+    if (!is_object($moderation)) {
+        require_once MYBB_ROOT . 'inc/class_moderation.php';
+        $moderation = new Moderation();
+    }
+
+    $existingForumIDs = array_column(cache_forums(), 'fid');
+
+    // Get action list
+    $forumactions = $db->simple_select($sysname, '*', "enabled = '1'");
+
+    while ($action = $db->fetch_array($forumactions)) {
+        $whereClauses = [];
+
+        $whereClauses[] = "t.sticky='0'";
+
+        if ($action['lastpost'] == 1) {
+            $whereClauses[] = "t.lastpost < '" . (TIME_NOW - $action['agesecs']) . "'";
+        } else {
+            $whereClauses[] = "t.dateline < '" . (TIME_NOW - $action['agesecs']) . "'";
+        }
+
+        if ($action['fid'] != '-1') {
+            $forums = implode("','", array_map('intval', explode(',', $action['fid'])));
+
+            $whereClauses[] = "t.fid IN ('{$forums}')";
+        }
+
+        $hasPrefixID = (int)$action['hasPrefixID'];
+
+        if ($hasPrefixID !== -1) {
+            $whereClauses[] = "t.prefix='{$hasPrefixID}'";
+        }
+
+        $threadLastEdit = get_seconds((int)$action['threadLastEdit'], $action['threadLastEditType']);
+
+        if ($threadLastEdit) {
+            $threadLastEdit = TIME_NOW - $threadLastEdit;
+
+            $whereClauses[] = "((p.edittime='0' AND t.dateline<'{$threadLastEdit}') OR (p.edittime!='0' AND p.edittime<'{$threadLastEdit}'))";
+        }
+
+        // delete permanent redirects
+        if ($action['action'] == 'del_redirects') {
+            $whereClauses[] = "t.closed LIKE 'moved|%'";
+
+            $whereClauses[] = "t.deletetime = '0'";
+
+            $db->delete_query(
+                "threads t LEFT JOIN {$db->table_prefix}posts p ON (p.pid=t.firstpost)",
+                't.tid',
+                implode(' AND ', $whereClauses)
+            );
+        } else {
+            // find open threads, complicated because 'closed' content is not always '0' for open threads
+            if ($action['action'] == 'close') {
+                $whereClauses[] = "t.closed <> '1'";
+
+                $whereClauses[] = "t.closed NOT LIKE 'moved|%'";
+            }
+
+            $query = $db->simple_select(
+                "threads t LEFT JOIN {$db->table_prefix}posts p ON (p.pid=t.firstpost)",
+                't.tid, p.edittime',
+                implode(' AND ', $whereClauses),
+                ['limit' => $threadlimit]
+            );
+
+            // nothing to do. required, because $moderation->close_threads do not check number of values.
+            if (!$db->num_rows($query)) {
+                continue;
+            }
+
+            if ($action['action'] == 'close') {
+                $tids = [];
+
+                while ($result = $db->fetch_array($query)) {
+                    $tids[] = $result['tid'];
+                }
+
+                $moderation->close_threads($tids);
+            } elseif ($action['action'] == 'move' || $action['action'] == 'delete') {
+                if ($action['action'] == 'move' && !in_array($action['tofid'], $existingForumIDs)) {
+                    continue;
+                }
+
+                while ($result = $db->fetch_array($query)) {
+                    if ($action['action'] == 'move') {
+                        $moderation->move_thread($result['tid'], $action['tofid'], 'move');
+                    } else {
+                        $moderation->delete_thread($result['tid']);
+                    }
+                }
+            }
+            // else ignore
+        }
+    }
+
+    if (function_exists('add_task_log')) {
+        add_task_log($task, 'The Forum Cleaning task successfully ran.');
     }
 }

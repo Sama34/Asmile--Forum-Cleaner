@@ -90,6 +90,8 @@ $l['forumcleaner_action_deleted'] = 'Action succesfuly deleted';
 
 $l['forumcleaner_invalid_age'] = 'The age should be at least 1';
 $l['forumcleaner_invalid_agetype'] = 'The age type is invalid';
+$l['ForumCleanerActionInvalidPrefix'] = 'The prefix is invalid';
+$l['ForumCleanerActionInvalidThreadLastEditType'] = 'The thread last edit type is invalid';
 $l['forumcleaner_invalid_forum_id'] = 'Provided forum id is invalid';
 $l['forumcleaner_invalid_action'] = 'Provided action is invalid';
 $l['forumcleaner_invalid_target_forum_id'] = 'Provided Target forum id is invalid';
@@ -113,6 +115,12 @@ $l['forumcleaner_thread_age_desc'] = 'How old thread should be to perform action
 
 $l['forumcleaner_thread_post_select'] = 'Which post time';
 $l['forumcleaner_thread_post_select_desc'] = 'Which post time to check';
+
+$l['ForumCleanerActionThreadLastEdit'] = 'Thread Last Edit';
+$l['ForumCleanerActionThreadLastEditDescription'] = 'Thread should have been edited to be selected for action. Thread creation time will be used if no edit time is available.';
+
+$l['ForumCleanerActionThreadHasPrefixIDSelect'] = 'Thread Has Prefix';
+$l['ForumCleanerActionThreadHasPrefixIDSelectDescription'] = 'Thread should have prefix to be selected for action.';
 
 $l['forumcleaner_thread_first_post'] = 'First post in thread';
 $l['forumcleaner_thread_last_post'] = 'Last post in thread';
