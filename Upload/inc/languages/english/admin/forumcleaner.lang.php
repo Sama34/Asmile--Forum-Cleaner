@@ -141,12 +141,16 @@ $l['forumcleaner_close_threads'] = 'Close Threads';
 $l['forumcleaner_delete_threads'] = 'Delete Threads';
 $l['forumcleaner_move_threads'] = 'Move Threads';
 $l['forumcleaner_delete_redirects'] = 'Delete Permanent Redirects';
+$l['forumcleaner_run_custom_tools'] = 'Run Custom Tool';
 
 $l['forumcleaner_thread_action'] = 'Thread Action';
 $l['forumcleaner_thread_action_desc'] = 'Select action to be performed on found thread.';
 
 $l['forumcleaner_thread_softDeleteThreads'] = 'Soft Delete Threads';
 $l['forumcleaner_thread_softDeleteThreads_desc'] = 'Soft delete threads instead of permanent delete. Required for "Delete Threads" Action.';
+
+$l['forumcleaner_thread_runCustomThreadTool'] = 'Run Custom Tool';
+$l['forumcleaner_thread_runCustomThreadToolDescription'] = 'Run custom tool on threads.';
 
 $l['forumcleaner_target_forum'] = 'Target Forum';
 $l['forumcleaner_target_forum_desc'] = // modified in 2.5.0

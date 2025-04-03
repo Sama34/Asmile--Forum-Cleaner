@@ -118,6 +118,11 @@ const TABLES_DATA = [
             'unsigned' => true,
             'default' => 1
         ],
+        'runCustomThreadTool' => [
+            'type' => 'INT',
+            'unsigned' => true,
+            'default' => 0
+        ],
         'tofid' => [
             'type' => 'INT',
             'default' => -1

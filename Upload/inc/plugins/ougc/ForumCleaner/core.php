@@ -29,7 +29,7 @@ declare(strict_types=1);
 
 namespace ForumCleaner\Core;
 
-use Moderation;
+use CustomModeration;
 use UserDataHandler;
 
 use const ForumCleaner\DEBUG;
@@ -208,20 +208,22 @@ function executeTask(array &$taskData = []): void
     }
 
     // obtain standard functions to perform actions
-    //      $moderation->delete_thread($tid);
-    //      $moderation->move_thread($tid, $new_fid, 'move');
-    //      $moderation->close_threads($threadIDs)
+    //      $customModeration->delete_thread($tid);
+    //      $customModeration->move_thread($tid, $new_fid, 'move');
+    //      $customModeration->close_threads($threadIDs)
 
     require_once MYBB_ROOT . 'inc/class_moderation.php';
 
-    $moderation = new Moderation();
+    require_once MYBB_ROOT . 'inc/class_custommoderation.php';
+
+    $customModeration = new CustomModeration();
 
     $existingForumIDs = array_column(cache_forums(), 'fid');
 
     // Get action list
     $forumactions = $db->simple_select(
         SYSTEM_NAME,
-        'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid, hasReplies, hasRepliesType',
+        'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, runCustomThreadTool, tofid, hasReplies, hasRepliesType',
         "enabled = '1'"
     );
 
@@ -288,7 +290,7 @@ function executeTask(array &$taskData = []): void
                     $threadIDs = (int)$threadData['tid'];
                 }
 
-                $moderation->close_threads($threadIDs);
+                $customModeration->close_threads($threadIDs);
             }
         }
 
@@ -307,7 +309,7 @@ function executeTask(array &$taskData = []): void
             }
         }
 
-        // nothing to do. required, because $moderation->close_threads do not check number of values.
+        // nothing to do. required, because $customModeration->close_threads do not check number of values.
         if (!$threadIDs) {
             continue;
         }
@@ -315,19 +317,31 @@ function executeTask(array &$taskData = []): void
         if (in_array('delete', $forumActions)) {
             if (empty($action['softDeleteThreads'])) {
                 foreach ($threadIDs as $threadID) {
-                    $moderation->delete_thread($threadID);
+                    $customModeration->delete_thread($threadID);
                 }
 
                 continue;
             }
 
-            $moderation->soft_delete_threads($threadIDs);
+            $customModeration->soft_delete_threads($threadIDs);
         }
 
         if (in_array('move', $forumActions) && in_array($action['tofid'], $existingForumIDs)) {
             foreach ($threadIDs as $threadID) {
-                $moderation->move_thread($threadID, $action['tofid'], 'move');
+                $customModeration->move_thread($threadID, $action['tofid'], 'move');
             }
+        }
+
+        $runCustomThreadToolID = (int)$action['runCustomThreadTool'];
+
+        if ($runCustomThreadToolID) {
+            $customModerationToolData = $customModeration->tool_info($runCustomThreadToolID);
+
+            if (empty($customModerationToolData['tid']) || $customModerationToolData['type'] !== 't') {
+                continue;
+            }
+
+            $customModeration->execute($runCustomThreadToolID, $threadIDs);
         }
     }
 

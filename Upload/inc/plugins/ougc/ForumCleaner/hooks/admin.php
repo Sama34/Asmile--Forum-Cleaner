@@ -249,7 +249,7 @@ function forumcleaner_process_forumactions(): void
         } else {
             $result = $db->simple_select(
                 $systemName,
-                'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, tofid, hasReplies, hasRepliesType',
+                'xid, fid, enabled, threadslist_display, forumslist_display, action, age, agetype, agesecs, lastpost, threadLastEdit, threadLastEditType, hasPrefixID, softDeleteThreads, runCustomThreadTool, tofid, hasReplies, hasRepliesType',
                 "xid = '{$xid}'"
             );
             if ($db->num_rows($result)) {
@@ -320,6 +320,7 @@ function forumcleaner_process_forumactions(): void
         'delete' => $lang->forumcleaner_delete_threads,
         'move' => $lang->forumcleaner_move_threads,
         'del_redirects' => $lang->forumcleaner_delete_redirects,
+        'runCustomTool' => $lang->forumcleaner_run_custom_tools,
     ];
 
     $errors = [];
@@ -358,6 +359,7 @@ function forumcleaner_process_forumactions(): void
         $update_array['agetype'] = $mybb->get_input('agetype');
         $update_array['action'] = $mybb->get_input('forumaction', MyBB::INPUT_ARRAY);
         $update_array['softDeleteThreads'] = $mybb->get_input('softDeleteThreads', MyBB::INPUT_INT);
+        $update_array['runCustomThreadTool'] = $mybb->get_input('runCustomThreadTool', MyBB::INPUT_INT);
         $update_array['lastpost'] = $mybb->get_input('lastpost', MyBB::INPUT_INT);
         $update_array['threadLastEdit'] = $mybb->get_input('threadLastEdit', MyBB::INPUT_INT);
         $update_array['threadLastEditType'] = $mybb->get_input('threadLastEditType');
@@ -457,6 +459,7 @@ function forumcleaner_process_forumactions(): void
                 'tofid' => -1,
                 'forumaction' => ['close'],
                 'softDeleteThreads' => 1,
+                'runCustomThreadTool' => 0,
                 'age' => 1,
                 'agetype' => 'days',
                 'lastpost' => 1,
@@ -653,6 +656,28 @@ checkAction('forum');
         );
 
         $form_container->output_row(
+            $lang->forumcleaner_thread_runCustomThreadTool,
+            $lang->forumcleaner_thread_runCustomThreadToolDescription,
+            $form->generate_select_box(
+                'runCustomThreadTool',
+                (function () use ($db, $lang): array {
+                    $toolObjects = [0 => $lang->none];
+
+                    $query = $db->simple_select('modtools', 'tid, name', "type='t'");
+
+                    while ($threadToolData = $db->fetch_array($query)) {
+                        $toolObjects[(int)$threadToolData] = htmlspecialchars_uni($threadToolData['name']);
+                    }
+
+                    return $toolObjects;
+                })(),
+                $update_array['runCustomThreadTool'],
+                ['id' => 'runCustomThreadTool']
+            ),
+            'runCustomThreadTool'
+        );
+
+        $form_container->output_row(
             $lang->forumcleaner_target_forum,
             $lang->forumcleaner_target_forum_desc,
             $form->generate_forum_select(
@@ -755,6 +780,10 @@ checkAction('forum');
 
                             foreach (explode(',', $row['action']) as $action) {
                                 $actionsList[] = $forumactions[$action];
+                            }
+
+                            if (!empty($row['runCustomThreadTool'])) {
+                                $actionsList[] = $forumactions['runCustomTool'];
                             }
 
                             return $actionsList;
