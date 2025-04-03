@@ -127,6 +127,10 @@ const TABLES_DATA = [
             'type' => 'INT',
             'default' => -1
         ],
+        // todo, criterion for closed, open, or both threads
+        // todo, criterion for stuck, unstuck, or both threads
+        // todo, criterion for approved, unapproved, or both threads
+        // todo, has attachments
     ]
 ];
 
