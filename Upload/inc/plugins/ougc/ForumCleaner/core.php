@@ -344,8 +344,4 @@ function executeTask(array &$taskData = []): void
             $customModeration->execute($runCustomThreadToolID, $threadIDs);
         }
     }
-
-    if (function_exists('add_task_log')) {
-        add_task_log($taskData, 'The Forum Cleaning task successfully ran.');
-    }
 }

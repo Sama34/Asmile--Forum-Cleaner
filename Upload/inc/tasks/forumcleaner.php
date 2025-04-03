@@ -29,9 +29,11 @@ declare(strict_types=1);
 
 use function ForumCleaner\Core\executeTask;
 
-function task_forumcleaner(array &$task): array
+function task_forumcleaner(array &$taskData): array
 {
     executeTask();
 
-    return $task;
+    add_task_log($taskData, 'The Forum Cleaning task successfully ran.');
+
+    return $taskData;
 }// function task_forumcleaner($task)
